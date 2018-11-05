@@ -1,0 +1,142 @@
+// !$*UTF8*$!
+{
+	089C1669FE841209C02AAC07 /* Project object */ = {
+		activeBuildConfigurationName = Release;
+		activeTarget = 8D57630D048677EA00EA77CD /* NativeAPI */;
+		addToTargets = (
+			8D57630D048677EA00EA77CD /* NativeAPI */,
+		);
+		codeSenseManager = 8C86E3FF14751DAF0014224B /* Code sense */;
+		perUserDictionary = {
+			PBXConfiguration.PBXFileTableDataSource3.PBXFileTableDataSource = {
+				PBXFileTableDataSourceColumnSortingDirectionKey = "-1";
+				PBXFileTableDataSourceColumnSortingKey = PBXFileDataSource_Filename_ColumnID;
+				PBXFileTableDataSourceColumnWidthsKey = (
+					20,
+					833,
+					20,
+					48,
+					43,
+					43,
+					20,
+				);
+				PBXFileTableDataSourceColumnsKey = (
+					PBXFileDataSource_FiletypeID,
+					PBXFileDataSource_Filename_ColumnID,
+					PBXFileDataSource_Built_ColumnID,
+					PBXFileDataSource_ObjectSize_ColumnID,
+					PBXFileDataSource_Errors_ColumnID,
+					PBXFileDataSource_Warnings_ColumnID,
+					PBXFileDataSource_Target_ColumnID,
+				);
+			};
+			PBXPerProjectTemplateStateSaveDate = 350379973;
+			PBXWorkspaceStateSaveDate = 350379973;
+		};
+		perUserProjectItems = {
+			8C86E41B147526820014224B = 8C86E41B147526820014224B /* PBXTextBookmark */;
+			8C8C69D714879D5B004ED42A = 8C8C69D714879D5B004ED42A /* PBXTextBookmark */;
+			8CC7C4DE14E00DC50088CC73 = 8CC7C4DE14E00DC50088CC73 /* PBXTextBookmark */;
+			8CC7C4E014E00DC50088CC73 = 8CC7C4E014E00DC50088CC73 /* PBXTextBookmark */;
+			8CC7C4F814E00F520088CC73 = 8CC7C4F814E00F520088CC73 /* PBXTextBookmark */;
+		};
+		sourceControlManager = 8C86E3FE14751DAF0014224B /* Source Control */;
+		userBuildSettings = {
+		};
+	};
+	8C86E3FE14751DAF0014224B /* Source Control */ = {
+		isa = PBXSourceControlManager;
+		fallbackIsa = XCSourceControlManager;
+		isSCMEnabled = 0;
+		scmConfiguration = {
+			repositoryNamesForRoots = {
+				"" = "";
+			};
+		};
+	};
+	8C86E3FF14751DAF0014224B /* Code sense */ = {
+		isa = PBXCodeSenseManager;
+		indexTemplatePath = "";
+	};
+	8C86E41B147526820014224B /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 8C86E41C147526820014224B /* AdapterTest.cpp */;
+		name = "AdapterTest.cpp: 1";
+		rLen = 0;
+		rLoc = 0;
+		rType = 0;
+		vrLen = 232;
+		vrLoc = 0;
+	};
+	8C86E41C147526820014224B /* AdapterTest.cpp */ = {
+		isa = PBXFileReference;
+		lastKnownFileType = sourcecode.cpp.cpp;
+		name = AdapterTest.cpp;
+		path = /Users/svp/npapi/AdapterTest/AdapterTest.cpp;
+		sourceTree = "<absolute>";
+	};
+	8C8C69C414879C93004ED42A /* AddInNative.cpp */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1011, 8216}}";
+			sepNavSelRange = "{592, 0}";
+			sepNavVisRange = "{0, 1395}";
+		};
+	};
+	8C8C69C814879CAA004ED42A /* AddInNative.h */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1011, 1066}}";
+			sepNavSelRange = "{203, 0}";
+			sepNavVisRange = "{0, 1424}";
+		};
+	};
+	8C8C69C914879CB7004ED42A /* stdafx.h */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1011, 582}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{0, 361}";
+		};
+	};
+	8C8C69D714879D5B004ED42A /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 8C8C69C914879CB7004ED42A /* stdafx.h */;
+		name = "stdafx.h: 1";
+		rLen = 0;
+		rLoc = 0;
+		rType = 0;
+		vrLen = 361;
+		vrLoc = 0;
+	};
+	8CC7C4DE14E00DC50088CC73 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 8C8C69C814879CAA004ED42A /* AddInNative.h */;
+		name = "AddInNative.h: 8";
+		rLen = 0;
+		rLoc = 203;
+		rType = 0;
+		vrLen = 1424;
+		vrLoc = 0;
+	};
+	8CC7C4E014E00DC50088CC73 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 8C8C69C414879C93004ED42A /* AddInNative.cpp */;
+		name = "AddInNative.cpp: 27";
+		rLen = 0;
+		rLoc = 592;
+		rType = 0;
+		vrLen = 1401;
+		vrLoc = 0;
+	};
+	8CC7C4F814E00F520088CC73 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 8C8C69C414879C93004ED42A /* AddInNative.cpp */;
+		name = "AddInNative.cpp: 27";
+		rLen = 0;
+		rLoc = 592;
+		rType = 0;
+		vrLen = 1395;
+		vrLoc = 0;
+	};
+	8D57630D048677EA00EA77CD /* NativeAPI */ = {
+		activeExec = 0;
+	};
+}
