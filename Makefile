@@ -1,4 +1,11 @@
-TARGET=AddInNative.so
+ifeq ($(x32),1)
+CPU = 32
+else
+CPU = 64
+endif
+
+TARGETDIR = $(CURDIR)/linux/x$(CPU)/
+TARGET = $(TARGETDIR)RegExp.so
 
 SOURCES=AddInNative.cpp \
 	dllmain.cpp \
@@ -8,7 +15,7 @@ LIBS=pthread
 
 OBJECTS=$(SOURCES:.cpp=.o)
 INCLUDES=-Iinclude
-CXXLAGS=$(CXXFLAGS) $(INCLUDES) -m32 -finput-charset=WINDOWS-1251 -fPIC -std=c++11
+CXXLAGS=$(CXXFLAGS) $(INCLUDES) -m$(CPU) -finput-charset=WINDOWS-1251 -fPIC -std=c++11
 
 all: $(TARGET)
 
