@@ -206,12 +206,25 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
         break;
     case ePropCurrentValue:
 		TV_VT(pvarPropVal) = VTYPE_PWSTR;
+
+#ifdef __linux__
+		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue.length() + 1) * sizeof(WCHAR_T)))
+		{
+			WCHAR_T* str_WCHAR_T = 0;
+			convToShortWchar(&str_WCHAR_T, wsCurrentValue.c_str(), wsCurrentValue.length() + 1);
+			memcpy(pvarPropVal->pwstrVal, str_WCHAR_T, (wsCurrentValue.length() + 1) * sizeof(WCHAR_T));
+			pvarPropVal->wstrLen = wsCurrentValue.length();
+			return true;
+		}
+#else
+		
 		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue.length() + 1) * sizeof(wchar_t)))
 		{
 			memcpy(pvarPropVal->pwstrVal, wsCurrentValue.c_str(), (wsCurrentValue.length() + 1) * sizeof(wchar_t));
 			pvarPropVal->wstrLen = wsCurrentValue.length();
 			return true;
 		}
+#endif
 		return false;
         break;
     default:
@@ -484,6 +497,43 @@ void CAddInNative::addError(uint32_t wcode, const wchar_t* source,
 void CAddInNative::search(tVariant * paParams)
 {
 #ifdef __linux__
+	// Сконвертируем в строку с wchar_t символами
+	wchar_t* str_wchar_t1 = 0;
+	convFromShortWchar(&str_wchar_t1, paParams[0].pwstrVal, paParams[0].wstrLen + 1);
+
+	std::wstring str(str_wchar_t1);
+	
+	wchar_t* str_wchar_t2 = 0;
+	convFromShortWchar(&str_wchar_t2, paParams[1].pwstrVal, paParams[1].wstrLen + 1);
+	std::wregex r(str_wchar_t2);
+	std::regex_search(str, wsmMatch, r);
+	
+	for (auto res : wsmMatch) {
+		vResults.push_back(res);
+	}
+	
+	delete[] str_wchar_t1;
+	delete[] str_wchar_t2;
+
+#else
+std::wstring str(paParams[0].pwstrVal);
+std::wregex r(paParams[1].pwstrVal);
+std::regex_search(str, wsmMatch, r);
+
+for (auto r : wsmMatch) {
+	vResults.push_back(r);
+}
+#endif
+	iCurrentPosition = -1;
+	m_PropCountOfItemsInSearchResult = wsmMatch.size();
+}
+bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
+{
+
+	iCurrentPosition = 0;
+	m_PropCountOfItemsInSearchResult = 0;
+
+#ifdef __linux__
 	std::wstring str;
 	// Сконвертируем в строку с wchar_t символами
 	wchar_t* str_wchar_t = 0;
@@ -494,25 +544,21 @@ void CAddInNative::search(tVariant * paParams)
 	convFromShortWchar(&str_wchar_t, paParams[1].pwstrVal, paParams[1].wstrLen);
 	std::wregex r(str_wchar_t);
 	delete[] str_wchar_t;
-	std::regex_search(str, wsmMatch, r);
-	for (auto r : wsmMatch) {
-		vResults.push_back(r);
-	}
+
+	convFromShortWchar(&str_wchar_t, paParams[2].pwstrVal, paParams[2].wstrLen);
+	std::wstring replacement(str_wchar_t);
+	delete[] str_wchar_t;
+
+	std::wstring res = std::regex_replace(str, r, replacement);
+
+	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(WCHAR_T)))
+	{
+
+		convToShortWchar(&pvarRetValue->pwstrVal, res.c_str(), res.length() * sizeof(WCHAR_T));
+		pvarRetValue->wstrLen = res.length();
+		return true;
+}
 #else
-std::wstring str(paParams[0].pwstrVal);
-std::wregex r(paParams[1].pwstrVal);
-std::regex_search(str, wsmMatch, r);
-for (auto r : wsmMatch) {
-	vResults.push_back(r);
-}
-#endif
-	iCurrentPosition = -1;
-	m_PropCountOfItemsInSearchResult = wsmMatch.size();
-}
-bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
-{
-	iCurrentPosition = 0;
-	m_PropCountOfItemsInSearchResult = 0;
 
 	std::wstring str(paParams[0].pwstrVal);
 	std::wregex r(paParams[1].pwstrVal);
@@ -525,14 +571,29 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		pvarRetValue->wstrLen = res.length();
 		return true;
 	}
-
+#endif
 	return false;
 }
 void CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 {
+	TV_VT(pvarRetValue) = VTYPE_BOOL;
+#ifdef __linux__
+	wchar_t* str_wchar_t1 = 0;
+	convFromShortWchar(&str_wchar_t1, paParams[0].pwstrVal, paParams[0].wstrLen + 1);
+
+	std::wstring str(str_wchar_t1);
+
+	wchar_t* str_wchar_t2 = 0;
+	convFromShortWchar(&str_wchar_t2, paParams[1].pwstrVal, paParams[1].wstrLen + 1);
+	std::wregex r(str_wchar_t2);
+
+	pvarRetValue->bVal = std::regex_match(str, r);
+#else
+
 	std::wstring str(paParams[0].pwstrVal);
 	std::wregex r(paParams[1].pwstrVal); 
 	pvarRetValue->bVal = std::regex_match(str, r);
+#endif
 	iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
 
@@ -552,6 +613,7 @@ long CAddInNative::findName(const wchar_t* names[], const wchar_t* name,
     }
     return ret;
 }
+
 //---------------------------------------------------------------------------//
 uint32_t convToShortWchar(WCHAR_T** Dest, const wchar_t* Source, uint32_t len)
 {
@@ -621,6 +683,69 @@ uint32_t convFromShortWchar(wchar_t** Dest, const WCHAR_T* Source, uint32_t len)
     return res;
 }
 //---------------------------------------------------------------------------//
+
+
+/*
+//---------------------------------------------------------------------------//
+// Преобразует строку, состоящую из wchar_t символов, в строку, 
+// состоящую из WCHAR_T символов.
+// Вызов функции имеет смысл только на тех компиляторах, где wchar_t <> WCHAR_T
+// В Visual Studio, тип wchar_t = WCHAR_T, поэтому вызов функции не нужен.
+// Функция выделяет память из кучи, поэтому её нужно не забыть очистить
+// в вызывающей процедуре
+uint32_t convToShortWchar(WCHAR_T** Dest, const wchar_t* Source, uint32_t len)
+{
+	if (!len)
+		len = ::wcslen(Source) + 1;
+
+	if (!*Dest)
+		*Dest = new WCHAR_T[len];
+
+	WCHAR_T* tmpShort = *Dest;	wchar_t* tmpWChar = (wchar_t*)Source;
+	uint32_t res = 0;
+
+	::memset(*Dest, 0, len * sizeof(WCHAR_T));
+	do
+	{
+		*tmpShort++ = (WCHAR_T)*tmpWChar++;
+		++res;
+	} while (len-- && *tmpWChar);
+
+	return res;
+}
+
+//---------------------------------------------------------------------------//
+// Преобразует строку, состоящую из WCHAR_T символов, в строку, 
+// состоящую из wchar_t символов.
+// Вызов функции имеет смысл только на тех компиляторах, где wchar_t <> WCHAR_T
+// В Visual Studio, тип wchar_t = WCHAR_T, поэтому вызов функции не нужен.
+// Функция выделяет память из кучи, поэтому её в последствии нужно не забыть очистить
+// в вызывающей процедуре
+uint32_t convFromShortWchar(wchar_t** Dest, const WCHAR_T* Source, uint32_t len)
+{
+	if (!len)
+		len = getLenShortWcharStr(Source);
+
+	if (!*Dest) // Если строка пустая
+		(*Dest) = new wchar_t[len + 1];
+
+	wchar_t* tmpWChar = *Dest;
+	WCHAR_T* tmpShort = (WCHAR_T*)Source;
+	uint32_t res = 0;
+
+	::memset((*Dest), 0, (len + 1) * sizeof(wchar_t));
+	do
+	{
+		*tmpWChar++ = (wchar_t)*tmpShort++;
+		++res;
+	} while (len-- && *tmpShort);
+
+	// добавим символ конца строки
+	(*Dest)[res] = 0;
+	return res;
+}
+*/
+
 uint32_t getLenShortWcharStr(const WCHAR_T* Source)
 {
     uint32_t res = 0;

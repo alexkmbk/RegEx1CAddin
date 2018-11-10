@@ -259,3 +259,9 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
+/AddInNative.d
+/AddInNative.o
+/dllmain.d
+/dllmain.o
+/stdafx.d
+/stdafx.o
