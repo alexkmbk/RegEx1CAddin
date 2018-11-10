@@ -5,7 +5,7 @@ CPU = 64
 endif
 
 TARGETDIR = $(CURDIR)/linux/x$(CPU)/
-TARGET = $(TARGETDIR)RegExp.so
+TARGET = $(TARGETDIR)RegEx.so
 
 SOURCES=AddInNative.cpp \
 	dllmain.cpp \
