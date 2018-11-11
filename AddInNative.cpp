@@ -1,4 +1,4 @@
-
+﻿
 #include "stdafx.h"
 
 
@@ -18,32 +18,27 @@
 #include "AddInNative.h"
 #include <string>
 
-
-#define TIME_LEN 65
-
-#define BASE_ERRNO     7
-
 #ifdef WIN32
 #pragma setlocale("ru-RU" )
 #endif
 
 static const wchar_t *g_PropNames[] = {
-    L"CountOfItemsInSearchResult",
+    L"Count",
 	L"CurrentValue"
 };
 static const wchar_t *g_MethodNames[] = {
-    L"Search", 
-    L"Match", 
+    L"Matches", 
+    L"IsMatch", 
     L"Next",
 	L"Replace"
 };
 
 static const wchar_t *g_PropNamesRu[] = {
-    L"КоличествоЭлементовВРезультатеПоиска",
+    L"Количество",
 	L"ТекущееЗначение"
 };
 static const wchar_t *g_MethodNamesRu[] = {
-    L"Поиск", 
+    L"НайтиСовпадения", 
     L"Совпадает", 
     L"Следующий",
 	L"Заменить"
@@ -201,9 +196,9 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
     switch(lPropNum)
     {
     case ePropCountOfItemsInSearchResult:
-        TV_VT(pvarPropVal) = VTYPE_INT;
-        TV_INT(pvarPropVal) = m_PropCountOfItemsInSearchResult;
-        break;
+		TV_VT(pvarPropVal) = VTYPE_I4;
+		pvarPropVal->lVal = m_PropCountOfItemsInSearchResult;
+		return true;
     case ePropCurrentValue:
 		TV_VT(pvarPropVal) = VTYPE_PWSTR;
 
@@ -256,6 +251,7 @@ bool CAddInNative::IsPropReadable(const long lPropNum)
     switch(lPropNum)
     { 
     case ePropCountOfItemsInSearchResult:
+		return true;
     case ePropCurrentValue:
         return true;
     default:
@@ -338,9 +334,9 @@ long CAddInNative::GetNParams(const long lMethodNum)
 { 
     switch(lMethodNum)
     { 
-    case eMethSearch:
+    case eMethMatches:
         return 2;
-    case eMethMatch:
+    case eMethIsMatch:
         return 2;
 	case eMethReplace:
 		return 3;
@@ -360,8 +356,8 @@ bool CAddInNative::GetParamDefValue(const long lMethodNum, const long lParamNum,
 
     switch(lMethodNum)
     { 
-    case eMethSearch:
-    case eMethMatch:
+    case eMethMatches:
+    case eMethIsMatch:
     case eMethNext:
 	case eMethReplace:
         // There are no parameter values by default 
@@ -381,7 +377,7 @@ bool CAddInNative::HasRetVal(const long lMethodNum)
 		return true;
 	case eMethReplace:
 		return true;
-    case eMethMatch:
+    case eMethIsMatch:
         return true;
     default:
         return false;
@@ -395,10 +391,10 @@ bool CAddInNative::CallAsProc(const long lMethodNum,
 {
 	switch (lMethodNum)
 	{
-	case eMethSearch:
+	case eMethMatches:
 		search(paParams);
 		break;
-	case eMethMatch:
+	case eMethIsMatch:
 		break;
 	case eMethReplace:
 		break;
@@ -426,9 +422,9 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 	switch (lMethodNum)
 	{
 		// Method acceps one argument of type BinaryData ant returns its copy
-	case eMethSearch:
+	case eMethMatches:
 		break;
-	case eMethMatch:
+	case eMethIsMatch:
 	{
 		match(pvarRetValue, paParams);
 		return true;
@@ -529,32 +525,36 @@ for (auto r : wsmMatch) {
 }
 bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 {
-
+	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 	iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
 
 #ifdef __linux__
-	std::wstring str;
 	// Сконвертируем в строку с wchar_t символами
-	wchar_t* str_wchar_t = 0;
-	convFromShortWchar(&str_wchar_t, paParams[0].pwstrVal, paParams[0].wstrLen);
-	str = str_wchar_t;
-	delete[] str_wchar_t;
+	wchar_t* str_wchar_t1 = 0;
+	convFromShortWchar(&str_wchar_t1, paParams[0].pwstrVal, paParams[0].wstrLen + 1);
+	std::wstring str(str_wchar_t1);
 
-	convFromShortWchar(&str_wchar_t, paParams[1].pwstrVal, paParams[1].wstrLen);
-	std::wregex r(str_wchar_t);
-	delete[] str_wchar_t;
+	wchar_t* str_wchar_t2 = 0;
+	convFromShortWchar(&str_wchar_t2, paParams[1].pwstrVal, paParams[1].wstrLen + 1);
+	std::wregex r(str_wchar_t2);
 
-	convFromShortWchar(&str_wchar_t, paParams[2].pwstrVal, paParams[2].wstrLen);
-	std::wstring replacement(str_wchar_t);
-	delete[] str_wchar_t;
+	wchar_t* str_wchar_t3 = 0;
+	convFromShortWchar(&str_wchar_t3, paParams[2].pwstrVal, paParams[2].wstrLen + 1);
+	std::wstring replacement(str_wchar_t3);
 
 	std::wstring res = std::regex_replace(str, r, replacement);
+
+	delete[] str_wchar_t1;
+	delete[] str_wchar_t2;
+	delete[] str_wchar_t3;
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(WCHAR_T)))
 	{
 
-		convToShortWchar(&pvarRetValue->pwstrVal, res.c_str(), res.length() * sizeof(WCHAR_T));
+		WCHAR_T* str_WCHAR_T = 0;
+		convToShortWchar(&str_WCHAR_T, res.c_str(), res.length() + 1);
+		memcpy(pvarRetValue->pwstrVal, str_WCHAR_T, (res.length() + 1) * sizeof(WCHAR_T));
 		pvarRetValue->wstrLen = res.length();
 		return true;
 }
@@ -564,7 +564,6 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	std::wregex r(paParams[1].pwstrVal);
 	std::wstring res = std::regex_replace(str, r, paParams[2].pwstrVal);
 
-	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(wchar_t)))
 	{
 		memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(wchar_t));

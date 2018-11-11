@@ -15,7 +15,7 @@ LIBS=pthread
 
 OBJECTS=$(SOURCES:.cpp=.o)
 INCLUDES=-Iinclude
-CXXLAGS=$(CXXFLAGS) $(INCLUDES) -m$(CPU) -finput-charset=WINDOWS-1251 -fPIC -std=c++11
+CXXLAGS=$(CXXFLAGS) $(INCLUDES) -m$(CPU) -finput-charset=UTF-8 -fPIC -std=c++11
 
 all: $(TARGET)
 
@@ -34,4 +34,4 @@ $(TARGET): $(OBJECTS) Makefile
 	g++ $(CXXLAGS) -shared $(OBJECTS) -o $(TARGET) $(addprefix -l, $(LIBS))
 
 clean:
-	-rm $(TARGET) *.o *.d
+	rm -f $(CURDIR)/*.d $(CURDIR)/*.o 

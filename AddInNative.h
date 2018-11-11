@@ -1,4 +1,4 @@
-#ifndef __ADDINNATIVE_H__
+﻿#ifndef __ADDINNATIVE_H__
 #define __ADDINNATIVE_H__
 
 #include <regex>
@@ -21,8 +21,8 @@ public:
 
     enum Methods
     {
-        eMethSearch = 0,
-        eMethMatch,
+        eMethMatches = 0,
+        eMethIsMatch,
         eMethNext,
 		eMethReplace,
         eMethLast      // Always last
