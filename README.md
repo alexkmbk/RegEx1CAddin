@@ -41,8 +41,11 @@ Linux 64bit
 Результат будет содержать 3 элемента:
 
 Hello world
+
 Hello
+
 world
+
 
 ### Свойство Количество/Count
 
