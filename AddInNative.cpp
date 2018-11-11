@@ -683,68 +683,6 @@ uint32_t convFromShortWchar(wchar_t** Dest, const WCHAR_T* Source, uint32_t len)
 }
 //---------------------------------------------------------------------------//
 
-
-/*
-//---------------------------------------------------------------------------//
-// Преобразует строку, состоящую из wchar_t символов, в строку, 
-// состоящую из WCHAR_T символов.
-// Вызов функции имеет смысл только на тех компиляторах, где wchar_t <> WCHAR_T
-// В Visual Studio, тип wchar_t = WCHAR_T, поэтому вызов функции не нужен.
-// Функция выделяет память из кучи, поэтому её нужно не забыть очистить
-// в вызывающей процедуре
-uint32_t convToShortWchar(WCHAR_T** Dest, const wchar_t* Source, uint32_t len)
-{
-	if (!len)
-		len = ::wcslen(Source) + 1;
-
-	if (!*Dest)
-		*Dest = new WCHAR_T[len];
-
-	WCHAR_T* tmpShort = *Dest;	wchar_t* tmpWChar = (wchar_t*)Source;
-	uint32_t res = 0;
-
-	::memset(*Dest, 0, len * sizeof(WCHAR_T));
-	do
-	{
-		*tmpShort++ = (WCHAR_T)*tmpWChar++;
-		++res;
-	} while (len-- && *tmpWChar);
-
-	return res;
-}
-
-//---------------------------------------------------------------------------//
-// Преобразует строку, состоящую из WCHAR_T символов, в строку, 
-// состоящую из wchar_t символов.
-// Вызов функции имеет смысл только на тех компиляторах, где wchar_t <> WCHAR_T
-// В Visual Studio, тип wchar_t = WCHAR_T, поэтому вызов функции не нужен.
-// Функция выделяет память из кучи, поэтому её в последствии нужно не забыть очистить
-// в вызывающей процедуре
-uint32_t convFromShortWchar(wchar_t** Dest, const WCHAR_T* Source, uint32_t len)
-{
-	if (!len)
-		len = getLenShortWcharStr(Source);
-
-	if (!*Dest) // Если строка пустая
-		(*Dest) = new wchar_t[len + 1];
-
-	wchar_t* tmpWChar = *Dest;
-	WCHAR_T* tmpShort = (WCHAR_T*)Source;
-	uint32_t res = 0;
-
-	::memset((*Dest), 0, (len + 1) * sizeof(wchar_t));
-	do
-	{
-		*tmpWChar++ = (wchar_t)*tmpShort++;
-		++res;
-	} while (len-- && *tmpShort);
-
-	// добавим символ конца строки
-	(*Dest)[res] = 0;
-	return res;
-}
-*/
-
 uint32_t getLenShortWcharStr(const WCHAR_T* Source)
 {
     uint32_t res = 0;
