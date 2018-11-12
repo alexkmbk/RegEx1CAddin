@@ -14,8 +14,7 @@ class CAddInNative : public IComponentBase
 public:
     enum Props
     {
-        ePropCountOfItemsInSearchResult = 0,
-		ePropCurrentValue,
+		ePropCurrentValue = 0,
         ePropLast      // Always last
     };
 
@@ -25,6 +24,7 @@ public:
         eMethIsMatch,
         eMethNext,
 		eMethReplace,
+		eMethCount,
         eMethLast      // Always last
     };
 

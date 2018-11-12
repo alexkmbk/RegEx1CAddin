@@ -23,25 +23,25 @@
 #endif
 
 static const wchar_t *g_PropNames[] = {
-    L"Count",
-	L"CurrentValue"
+   L"CurrentValue"
 };
 static const wchar_t *g_MethodNames[] = {
     L"Matches", 
     L"IsMatch", 
     L"Next",
-	L"Replace"
+	L"Replace",
+	L"Count"
 };
 
 static const wchar_t *g_PropNamesRu[] = {
-    L"Количество",
-	L"ТекущееЗначение"
+   L"ТекущееЗначение"
 };
 static const wchar_t *g_MethodNamesRu[] = {
     L"НайтиСовпадения", 
     L"Совпадает", 
     L"Следующий",
-	L"Заменить"
+	L"Заменить",
+	L"Количество"
 };
 
 static const wchar_t g_kClassNames[] = L"CAddInNative"; //"|OtherClass1|OtherClass2";
@@ -195,10 +195,6 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 { 
     switch(lPropNum)
     {
-    case ePropCountOfItemsInSearchResult:
-		TV_VT(pvarPropVal) = VTYPE_I4;
-		pvarPropVal->lVal = m_PropCountOfItemsInSearchResult;
-		return true;
     case ePropCurrentValue:
 		TV_VT(pvarPropVal) = VTYPE_PWSTR;
 
@@ -250,8 +246,6 @@ bool CAddInNative::IsPropReadable(const long lPropNum)
 { 
     switch(lPropNum)
     { 
-    case ePropCountOfItemsInSearchResult:
-		return true;
     case ePropCurrentValue:
         return true;
     default:
@@ -379,6 +373,8 @@ bool CAddInNative::HasRetVal(const long lMethodNum)
 		return true;
     case eMethIsMatch:
         return true;
+	case eMethCount:
+		return true;
     default:
         return false;
     }
@@ -449,6 +445,10 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		}
 	}
 	break;
+	case eMethCount:
+		TV_VT(pvarRetValue) = VTYPE_I4;
+		pvarRetValue->lVal = m_PropCountOfItemsInSearchResult;
+		return true;
 	default:
 		return false;
 	}
@@ -516,6 +516,7 @@ std::wstring str(paParams[0].pwstrVal);
 std::wregex r(paParams[1].pwstrVal);
 std::regex_search(str, wsmMatch, r);
 
+vResults.clear();
 for (auto r : wsmMatch) {
 	vResults.push_back(r);
 }
@@ -528,6 +529,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 	iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
+	vResults.clear();
 
 #ifdef __linux__
 	// Сконвертируем в строку с wchar_t символами
@@ -595,6 +597,7 @@ void CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 #endif
 	iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
+	vResults.clear();
 
 }
 //---------------------------------------------------------------------------//
