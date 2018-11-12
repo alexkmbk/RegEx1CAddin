@@ -504,6 +504,7 @@ void CAddInNative::search(tVariant * paParams)
 	std::wregex r(str_wchar_t2);
 	std::regex_search(str, wsmMatch, r);
 	
+	vResults.clear();
 	for (auto res : wsmMatch) {
 		vResults.push_back(res);
 	}
