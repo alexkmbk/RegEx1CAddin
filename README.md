@@ -1,4 +1,4 @@
-[![Join the chat at https://gitter.im/RegEx1CAddin/Lobby](https://badges.gitter.im/RegEx1CAddin.svg)](https://gitter.im/techlogqueryviewer/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Join the chat at https://gitter.im/RegEx1CAddin/Lobby](https://badges.gitter.im/RegEx1CAddin.svg)](https://gitter.im/RegEx1CAddin/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 # RegEx1CAddin
 
