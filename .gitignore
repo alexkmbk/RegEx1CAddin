@@ -22,6 +22,8 @@ bld/
 [Oo]bj/
 [Ll]og/
 Linux/
+lib/webbrowsers
+MacBuild/
 Package/
 Bin64/
 # Visual Studio 2015 cache/options directory

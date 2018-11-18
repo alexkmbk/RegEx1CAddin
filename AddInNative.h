@@ -72,10 +72,8 @@ private:
     IMemoryManager     *m_iMemory;
 
 	uint32_t m_PropCountOfItemsInSearchResult;
-	std::wsmatch wsmMatch;
 	std::vector<std::wstring> vResults;
 	uint32_t iCurrentPosition;
-	std::wstring wsCurrentValue;
 };
 
 class WcharWrapper

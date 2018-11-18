@@ -98,7 +98,9 @@ struct uuid_st {
     unsigned char  Data4[ 8 ];
 };
 
+#if !defined(__APPLE__)
 typedef struct uuid_st uuid_t;
+#endif
 
 /* UUID object handling */
 extern uuid_rc_t     uuid_create   (      uuid_t **_uuid);

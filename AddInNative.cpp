@@ -192,13 +192,14 @@ const WCHAR_T* CAddInNative::GetPropName(long lPropNum, long lPropAlias)
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
-{ 
-    switch(lPropNum)
-    {
-    case ePropCurrentValue:
+{
+	switch (lPropNum)
+	{
+	case ePropCurrentValue:
+	{
 		TV_VT(pvarPropVal) = VTYPE_PWSTR;
-
-#ifdef __linux__
+		std::wstring wsCurrentValue(vResults[iCurrentPosition]);
+#if defined( __linux__ ) || defined(__APPLE__)
 		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue.length() + 1) * sizeof(WCHAR_T)))
 		{
 			WCHAR_T* str_WCHAR_T = 0;
@@ -208,7 +209,7 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 			return true;
 		}
 #else
-		
+
 		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue.length() + 1) * sizeof(wchar_t)))
 		{
 			memcpy(pvarPropVal->pwstrVal, wsCurrentValue.c_str(), (wsCurrentValue.length() + 1) * sizeof(wchar_t));
@@ -217,12 +218,13 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 		}
 #endif
 		return false;
-        break;
-    default:
-        return false;
-    }
+		break;
+	}
+	default:
+		return false;
+	}
 
-    return true;
+	return true;
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
@@ -401,7 +403,6 @@ bool CAddInNative::CallAsProc(const long lMethodNum,
 		}
 		else {
 			iCurrentPosition++;
-			wsCurrentValue = wsmMatch[iCurrentPosition];
 			return true;
 		}
 	}
@@ -440,7 +441,6 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		else {
 			TV_VT(pvarRetValue) = VTYPE_BOOL;
 			pvarRetValue->bVal = true;
-			wsCurrentValue = vResults[iCurrentPosition];
 			return true;
 		}
 	}
@@ -492,7 +492,8 @@ void CAddInNative::addError(uint32_t wcode, const wchar_t* source,
 }
 void CAddInNative::search(tVariant * paParams)
 {
-#ifdef __linux__
+std::wsmatch wsmMatch;
+#if defined( __linux__ ) || defined(__APPLE__)
 	// Сконвертируем в строку с wchar_t символами
 	wchar_t* str_wchar_t1 = 0;
 	convFromShortWchar(&str_wchar_t1, paParams[0].pwstrVal, paParams[0].wstrLen + 1);
@@ -532,7 +533,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	m_PropCountOfItemsInSearchResult = 0;
 	vResults.clear();
 
-#ifdef __linux__
+#if defined( __linux__ ) || defined(__APPLE__)
 	// Сконвертируем в строку с wchar_t символами
 	wchar_t* str_wchar_t1 = 0;
 	convFromShortWchar(&str_wchar_t1, paParams[0].pwstrVal, paParams[0].wstrLen + 1);
@@ -579,7 +580,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 {
 	TV_VT(pvarRetValue) = VTYPE_BOOL;
-#ifdef __linux__
+#if defined( __linux__ ) || defined(__APPLE__)
 	wchar_t* str_wchar_t1 = 0;
 	convFromShortWchar(&str_wchar_t1, paParams[0].pwstrVal, paParams[0].wstrLen + 1);
 
@@ -631,7 +632,7 @@ uint32_t convToShortWchar(WCHAR_T** Dest, const wchar_t* Source, uint32_t len)
     uint32_t res = 0;
 
     ::memset(*Dest, 0, len * sizeof(WCHAR_T));
-#ifdef __linux__
+#if defined( __linux__ ) || defined(__APPLE__)
     size_t succeed = (size_t)-1;
     size_t f = len * sizeof(wchar_t), t = len * sizeof(WCHAR_T);
     const char* fromCode = sizeof(wchar_t) == 2 ? "UTF-16" : "UTF-32";
@@ -665,7 +666,7 @@ uint32_t convFromShortWchar(wchar_t** Dest, const WCHAR_T* Source, uint32_t len)
     uint32_t res = 0;
 
     ::memset(*Dest, 0, len * sizeof(wchar_t));
-#ifdef __linux__
+#if defined( __linux__ ) || defined(__APPLE__)
     size_t succeed = (size_t)-1;
     const char* fromCode = sizeof(wchar_t) == 2 ? "UTF-16" : "UTF-32";
     size_t f = len * sizeof(WCHAR_T), t = len * sizeof(wchar_t);

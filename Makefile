@@ -15,7 +15,7 @@ LIBS=pthread
 
 OBJECTS=$(SOURCES:.cpp=.o)
 INCLUDES=-Iinclude
-CXXLAGS=$(CXXFLAGS) $(INCLUDES) -m$(CPU) -finput-charset=UTF-8 -fPIC -std=c++11
+CXXLAGS=$(CXXFLAGS) $(INCLUDES) -m$(CPU) -finput-charset=UTF-8 -fPIC -std=c++14
 
 all: $(TARGET)
 
