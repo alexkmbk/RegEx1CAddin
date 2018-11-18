@@ -1,3 +1,5 @@
+[![Join the chat at https://gitter.im/RegEx1CAddin/Lobby](https://badges.gitter.im/RegEx1CAddin.svg)](https://gitter.im/RegEx1CAddin/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 # RegEx1CAddin
 
 Внешняя Native API компонента для выполнения регулярных выражений на платформе 1С:Предприятие 8. Написана на C++. Используется движок из стандартной библиотеки шаблонов C++11 - std::regex.
