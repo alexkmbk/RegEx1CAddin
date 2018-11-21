@@ -10,8 +10,9 @@ Windows 32bit
 Windows 64bit 
 Linux 32bit 
 Linux 64bit 
+MacOS 64bit 
 
-Тестировалось на платформе 8.3.12.1567 (Windows XP SP3, Windows 7, Windows Server 2008 R2, Ubuntu 14 32-64bit)
+Тестировалось на платформе 8.3.12.1567 (Windows XP SP3, Windows 7, Windows Server 2008 R2, Ubuntu 14 32-64bit, MacOS Sierra 10.12)
 
 Сборка осуществлялась с использованием следующих инструментов:
 
