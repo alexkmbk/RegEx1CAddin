@@ -1,11 +1,14 @@
 ﻿#ifndef __ADDINNATIVE_H__
 #define __ADDINNATIVE_H__
 
-#include <regex>
+//#include <regex>
+#include "boost/regex.hpp"
 
 #include "ComponentBase.h"
 #include "AddInDefBase.h"
 #include "IMemoryManager.h"
+
+#define MBCMAXSIZE  6 // максимальная длина символа мультибайтовой строки (для функции wcstombs)
 
 ///////////////////////////////////////////////////////////////////////////////
 // class CAddInNative
@@ -15,6 +18,11 @@ public:
     enum Props
     {
 		ePropCurrentValue = 0,
+		ePropIgnoreCase,
+		ePropErrorDescription,
+		ePropThrowExceptions,
+		ePropPattern,
+		ePropGlobal,
         ePropLast      // Always last
     };
 
@@ -25,6 +33,7 @@ public:
         eMethNext,
 		eMethReplace,
 		eMethCount,
+		eMethVersion,
         eMethLast      // Always last
     };
 
@@ -61,11 +70,12 @@ public:
     
 private:
     long findName(const wchar_t* names[], const wchar_t* name, const uint32_t size) const;
-    void addError(uint32_t wcode, const wchar_t* source, 
-                    const wchar_t* descriptor, long code);
-	void search(tVariant* paParams);
+
+	bool search(tVariant* paParams);
 	bool replace(tVariant* pvarRetValue, tVariant* paParams);
-	void match(tVariant* pvarRetValue, tVariant* paParams);
+	bool match(tVariant* pvarRetValue, tVariant* paParams);
+	void version(tVariant* pvarRetValue);
+	void SetLastError(const char* error);
 
     // Attributes
     IAddInDefBase      *m_iConnect;
@@ -74,6 +84,12 @@ private:
 	uint32_t m_PropCountOfItemsInSearchResult;
 	std::vector<std::wstring> vResults;
 	uint32_t iCurrentPosition;
+	std::string sErrorDescription;
+	bool bThrowExceptions;
+	bool bIgnoreCase;
+	boost::wregex rePattern;
+	std::basic_string<WCHAR> wcsPattern;
+	bool bGlobal;
 };
 
 class WcharWrapper

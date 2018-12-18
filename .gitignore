@@ -26,6 +26,8 @@ lib/webbrowsers
 MacBuild/
 Package/
 Bin64/
+in.txt
+mock.txt
 # Visual Studio 2015 cache/options directory
 .vs/
 # Uncomment if you have tasks that create the project's static files in wwwroot

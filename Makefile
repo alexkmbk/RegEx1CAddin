@@ -5,13 +5,21 @@ CPU = 64
 endif
 
 TARGETDIR = $(CURDIR)/linux/x$(CPU)/
-TARGET = $(TARGETDIR)RegEx.so
+TARGET = $(TARGETDIR)RegEx$(CPU).so
 
 SOURCES=AddInNative.cpp \
 	dllmain.cpp \
 	stdafx.cpp 
 
-LIBS=pthread
+ifeq ($(macos),1)
+TARGETDIR = "$(CURDIR)/macos/"
+LIBPATHS = -Llib/libiconv/
+LIBS= iconv
+else
+TARGETDIR = $(CURDIR)/linux/x$(CPU)/
+LIBPATHS = -Llib/linux/x$(CPU)/
+LIBS=pthread boost_regex
+endif
 
 OBJECTS=$(SOURCES:.cpp=.o)
 INCLUDES=-Iinclude
@@ -31,7 +39,7 @@ all: $(TARGET)
 	@rm -f $*.d.tmp
 
 $(TARGET): $(OBJECTS) Makefile
-	g++ $(CXXLAGS) -shared $(OBJECTS) -o $(TARGET) $(addprefix -l, $(LIBS))
+	g++ $(CXXLAGS) $(LIBPATHS) -shared $(OBJECTS) -o $(TARGET) $(addprefix -l, $(LIBS))
 
 clean:
 	rm -f $(CURDIR)/*.d $(CURDIR)/*.o 
