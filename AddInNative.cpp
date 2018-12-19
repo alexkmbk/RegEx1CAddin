@@ -606,7 +606,7 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 // 
 void CAddInNative::SetLocale(const WCHAR_T* loc)
 {
-#ifndef __linux__
+#if !defined( __linux__ ) && !defined(__APPLE__)
 	// если платформа передала неправильное название локали, то устанавливаем системную локаль по умолчанию
 	// если вовсе не установить локаль, то STL будет поддерживать только символы латиницы!!!
 	if (_wsetlocale(LC_ALL, loc) == NULL) _wsetlocale(LC_ALL, L"");

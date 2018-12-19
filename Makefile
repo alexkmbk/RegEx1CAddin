@@ -4,19 +4,18 @@ else
 CPU = 64
 endif
 
-TARGETDIR = $(CURDIR)/linux/x$(CPU)/
-TARGET = $(TARGETDIR)RegEx$(CPU).so
-
 SOURCES=AddInNative.cpp \
 	dllmain.cpp \
 	stdafx.cpp 
 
 ifeq ($(macos),1)
 TARGETDIR = "$(CURDIR)/macos/"
-LIBPATHS = -Llib/libiconv/
-LIBS= iconv
+TARGET = $(TARGETDIR)RegExMac64.so
+LIBPATHS = -Llib/macos/
+LIBS= iconv boost_regex
 else
 TARGETDIR = $(CURDIR)/linux/x$(CPU)/
+TARGET = $(TARGETDIR)RegEx$(CPU).so
 LIBPATHS = -Llib/linux/x$(CPU)/
 LIBS=pthread boost_regex
 endif
