@@ -1,7 +1,6 @@
 ﻿#ifndef __ADDINNATIVE_H__
 #define __ADDINNATIVE_H__
 
-//#include <regex>
 #include "boost/regex.hpp"
 
 #include "ComponentBase.h"

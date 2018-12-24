@@ -1,16 +1,8 @@
 ﻿
 #include "stdafx.h"
 
-
 #if defined( __linux__ ) || defined(__APPLE__)
-#include <unistd.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <time.h>
-#include <errno.h>
 #include <iconv.h>
-#include <sys/time.h>
-//#include <regex>
 #endif
 
 #include <stdio.h>
@@ -18,41 +10,17 @@
 #include "AddInNative.h"
 #include <string>
 
-static const wchar_t *g_PropNames[] = {
-   L"CurrentValue",
-   L"IgnoreCase",
-   L"ErrorDescription",
-   L"ThrowExceptions",
-   L"Pattern",
-   L"Global"
-};
-static const wchar_t *g_MethodNames[] = {
-    L"Matches", 
-    L"IsMatch", 
-    L"Next",
-	L"Replace",
-	L"Count",
-	L"Version"
-};
+static std::map<std::u16string, long> mMethods;
+static std::vector<std::u16string> vMethods;
+static std::map<std::u16string, long> mMethods_ru;
+static std::vector<std::u16string> vMethods_ru;
 
-static const wchar_t *g_PropNamesRu[] = {
-   L"ТекущееЗначение",
-   L"ИгнорироватьРегистр",
-   L"ОписаниеОшибки",
-   L"ВызыватьИсключения",
-   L"Шаблон",
-   L"ВсеСовпадения"
-};
-static const wchar_t *g_MethodNamesRu[] = {
-    L"НайтиСовпадения", 
-    L"Совпадает", 
-    L"Следующий",
-	L"Заменить",
-	L"Количество",
-	L"Версия"
-};
+static std::map<std::u16string, long> mProps;
+static std::vector<std::u16string> vProps;
+static std::map<std::u16string, long> mProps_ru;
+static std::vector<std::u16string> vProps_ru;
 
-static const wchar_t g_kClassNames[] = L"CAddInNative"; //"|OtherClass1|OtherClass2";
+static const wchar_t g_kClassNames[] = L"CAddInNative";
 static IAddInDefBase *pAsyncEvent = NULL;
 
 uint32_t convToShortWchar(WCHAR_T** Dest, const wchar_t* Source, uint32_t len = 0);
@@ -60,6 +28,7 @@ uint32_t convFromShortWchar(wchar_t** Dest, const WCHAR_T* Source, uint32_t len 
 uint32_t getLenShortWcharStr(const WCHAR_T* Source);
 static AppCapabilities g_capabilities = eAppCapabilitiesInvalid;
 static WcharWrapper s_names(g_kClassNames);
+
 //---------------------------------------------------------------------------//
 long GetClassObject(const WCHAR_T* wsName, IComponentBase** pInterface)
 {
@@ -108,6 +77,54 @@ CAddInNative::CAddInNative()
 	wcsPattern.clear();
 	wcsPattern.assign(L"");
 	bGlobal = false;
+
+	if (mMethods.size() == 0) {
+		mMethods = { 
+		{u"matches", eMethMatches},
+		{u"ismatch", eMethIsMatch},
+		{u"next", eMethNext},
+		{u"replace", eMethReplace},
+		{u"count", eMethCount},
+		{u"version", eMethVersion},
+		};
+		vMethods = { u"Matches", u"IsMatch", u"Next", u"Replace", u"Count", u"Version"};
+	}
+
+	if (mMethods_ru.size() == 0) {
+		mMethods_ru = { 
+		{u"найтисовпадения", eMethMatches},
+		{u"совпадает", eMethIsMatch},
+		{u"следующий", eMethNext},
+		{u"заменить", eMethReplace},
+		{u"количество", eMethCount},
+		{u"версия", eMethVersion},
+		};
+		vMethods_ru = { u"НайтиСовпадения", u"Совпадает", u"Следующий", u"Заменить", u"Количество", u"Версия" };
+	}
+
+	if (mProps.size() == 0) {
+		mProps = { 
+		{u"currentvalue", ePropCurrentValue},
+		{u"ignorecase", ePropIgnoreCase},
+		{u"errordescription", ePropErrorDescription},
+		{u"throwexceptions", ePropThrowExceptions},
+		{u"pattern", ePropPattern},
+		{u"global", ePropGlobal},
+		};
+		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global" };
+	}
+
+	if (mProps_ru.size() == 0) {
+		mProps_ru = { 
+		{u"текущеезначение", ePropCurrentValue},
+		{u"игнорироватьрегистр", ePropIgnoreCase},
+		{u"описаниеошибки", ePropErrorDescription},
+		{u"вызыватьисключения", ePropThrowExceptions},
+		{u"шаблон", ePropPattern},
+		{u"всесовпадения", ePropGlobal},
+		};
+		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения" };
+	}
 }
 //---------------------------------------------------------------------------//
 CAddInNative::~CAddInNative()
@@ -136,47 +153,36 @@ void CAddInNative::Done()
 //---------------------------------------------------------------------------//
 bool CAddInNative::RegisterExtensionAs(WCHAR_T** wsExtensionName)
 { 
-    const wchar_t *wsExtension = L"RegEx";
-    int iActualSize = ::wcslen(wsExtension) + 1;
-    WCHAR_T* dest = 0;
+	char16_t name[] = u"RegEx";
 
-    if (m_iMemory)
-    {
-        if(m_iMemory->AllocMemory((void**)wsExtensionName, iActualSize * sizeof(WCHAR_T)))
-            ::convToShortWchar(wsExtensionName, wsExtension, iActualSize);
-        return true;
-    }
+	if (!m_iMemory || !m_iMemory->AllocMemory(reinterpret_cast<void **>(wsExtensionName), sizeof(name))) {
+		return false;
+	};
 
-    return false; 
+	memcpy(*wsExtensionName, name, sizeof(name));
+
+	return true;
 }
 //---------------------------------------------------------------------------//
 long CAddInNative::GetNProps()
 { 
-    // You may delete next lines and add your own implementation code here
     return ePropLast;
 }
 //---------------------------------------------------------------------------//
 long CAddInNative::FindProp(const WCHAR_T* wsPropName)
 { 
-    long plPropNum = -1;
-    wchar_t* propName = 0;
+	std::basic_string<char16_t> usPropName = (char16_t*)(wsPropName);
+	std::transform(usPropName.begin(), usPropName.end(), usPropName.begin(), ::towlower);
 
-#if defined( __linux__ ) || defined(__APPLE__)
-	::convFromShortWchar(&propName, wsPropName);
-#else
-	propName = (wchar_t*)wsPropName;
-#endif
+	auto it = mProps.find(usPropName);
+	if (it != mProps.end())
+		return it->second;
 
-    plPropNum = findName(g_PropNames, propName, ePropLast);
+	it = mProps_ru.find(usPropName);
+	if (it != mProps_ru.end())
+		return it->second;
 
-    if (plPropNum == -1)
-        plPropNum = findName(g_PropNamesRu, propName, ePropLast);
-
-#if defined( __linux__ ) || defined(__APPLE__)
-    delete[] propName;
-#endif
-
-    return plPropNum;
+	return -1;
 }
 
 //---------------------------------------------------------------------------//
@@ -185,28 +191,35 @@ const WCHAR_T* CAddInNative::GetPropName(long lPropNum, long lPropAlias)
     if (lPropNum >= ePropLast)
         return NULL;
 
-    wchar_t *wsCurrentName = NULL;
-    WCHAR_T *wsPropName = NULL;
-    int iActualSize = 0;
+	std::basic_string<char16_t> *usCurrentName;
 
     switch(lPropAlias)
     {
     case 0: // First language
-        wsCurrentName = (wchar_t*)g_PropNames[lPropNum];
+		usCurrentName = &vProps[lPropNum];
         break;
     case 1: // Second language
-        wsCurrentName = (wchar_t*)g_PropNamesRu[lPropNum];
-        break;
-    default:
+		usCurrentName = &vProps_ru[lPropNum];
+		break;
+	default:
         return 0;
     }
 
-	iActualSize = wcslen(wsCurrentName) + 1;
+	if (usCurrentName->length() == 0) {
+		return nullptr;
+	}
 
-	if (m_iMemory->AllocMemory((void**)&wsPropName, iActualSize * sizeof(WCHAR_T)))
-		::convToShortWchar(&wsPropName, wsCurrentName, iActualSize);
+	WCHAR_T *result = nullptr;
 
-	return wsPropName;
+	size_t bytes = (usCurrentName->length() + 1) * sizeof(char16_t);
+
+	if (!m_iMemory || !m_iMemory->AllocMemory(reinterpret_cast<void **>(&result), bytes)) {
+		return nullptr;
+	};
+
+	memcpy(result, usCurrentName->c_str(), bytes);
+
+	return result;
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
@@ -381,56 +394,52 @@ long CAddInNative::GetNMethods()
 //---------------------------------------------------------------------------//
 long CAddInNative::FindMethod(const WCHAR_T* wsMethodName)
 {
-	long plMethodNum = -1;
-	wchar_t* name = 0;
 
-#if defined( __linux__ ) || defined(__APPLE__)
-	::convFromShortWchar(&name, wsMethodName);
-#else
-	name = (wchar_t*)wsMethodName;
-#endif
-	plMethodNum = findName(g_MethodNames, name, eMethLast);
+	std::basic_string<char16_t> usMethodName = (char16_t*)(wsMethodName);
+	std::transform(usMethodName.begin(), usMethodName.end(), usMethodName.begin(), ::towlower);
 
-	if (plMethodNum == -1)
-		plMethodNum = findName(g_MethodNamesRu, name, eMethLast);
+	auto it = mMethods.find(usMethodName);
+	if (it != mMethods.end())
+		return it->second;
+	
+	it = mMethods_ru.find(usMethodName);
+	if (it != mMethods_ru.end())
+		return it->second;
 
-#if defined( __linux__ ) || defined(__APPLE__)
-	delete[] name;
-#endif
-
-	return plMethodNum;
+	return -1;
 }
 //---------------------------------------------------------------------------//
 const WCHAR_T* CAddInNative::GetMethodName(const long lMethodNum, const long lMethodAlias)
 { 
-    if (lMethodNum >= eMethLast)
-        return NULL;
 
-    wchar_t *wsCurrentName = NULL;
-    WCHAR_T *wsMethodName = NULL;
-    int iActualSize = 0;
+	if (lMethodNum >= eMethLast)
+		return NULL;
 
-    switch(lMethodAlias)
-    {
-    case 0: // First language
-        wsCurrentName = (wchar_t*)g_MethodNames[lMethodNum];
-        break;
-    case 1: // Second language
-        wsCurrentName = (wchar_t*)g_MethodNamesRu[lMethodNum];
-        break;
-    default: 
-        return 0;
-    }
+	std::basic_string<char16_t> *usCurrentName;
 
-    iActualSize = wcslen(wsCurrentName) + 1;
+	switch (lMethodAlias)
+	{
+	case 0: // First language
+		usCurrentName = &vMethods[lMethodNum];
+		break;
+	case 1: // Second language
+		usCurrentName = &vMethods_ru[lMethodNum];
+		break;
+	default:
+		return 0;
+	}
 
-    if (m_iMemory && wsCurrentName)
-    {
-        if(m_iMemory->AllocMemory((void**)&wsMethodName, iActualSize * sizeof(WCHAR_T)))
-            ::convToShortWchar(&wsMethodName, wsCurrentName, iActualSize);
-    }
+	WCHAR_T *result = nullptr;
 
-    return wsMethodName;
+	size_t bytes = (usCurrentName->length() + 1) * sizeof(char16_t);
+
+	if (!m_iMemory || !m_iMemory->AllocMemory(reinterpret_cast<void **>(&result), bytes)) {
+		return nullptr;
+	};
+
+	memcpy(result, usCurrentName->c_str(), bytes);
+
+	return result;
 }
 //---------------------------------------------------------------------------//
 long CAddInNative::GetNParams(const long lMethodNum)
@@ -560,7 +569,6 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 	break;
 	case eMethReplace:
 		return replace(pvarRetValue, paParams);
-		break;
 	case eMethNext:
 	{
 		iCurrentPosition++;
@@ -588,6 +596,7 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 	default:
 		return false;
 	}
+	return true;
 }
 
 //---------------------------------------------------------------------------//
@@ -649,6 +658,9 @@ bool CAddInNative::search(tVariant * paParams)
 	vResults.clear();
 
 	boost::wsmatch wsmMatch;
+	boost::wregex* pattern = NULL;
+	bool bClearPttern = false;
+
 #if defined( __linux__ ) || defined(__APPLE__)
 	// Сконвертируем в строку с wchar_t символами
 	wchar_t* str_wchar_t1 = 0;
@@ -660,7 +672,6 @@ bool CAddInNative::search(tVariant * paParams)
 	convFromShortWchar(&str_wchar_t2, paParams[1].pwstrVal, paParams[1].wstrLen + 1);
 	try
 	{
-		boost::wregex* pattern;
 		if (paParams[1].wstrLen == 0)
 		{
 			if (wcsPattern.length() > 0)
@@ -669,7 +680,10 @@ bool CAddInNative::search(tVariant * paParams)
 				return true;
 		}
 		else
+		{
+			bClearPttern = true;
 			pattern = new boost::wregex(str_wchar_t2, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+		}
 
 		if (bGlobal)
 		{
@@ -705,16 +719,13 @@ bool CAddInNative::search(tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
+		if (bClearPttern && pattern != NULL)
+			delete pattern;
+
 		if (bThrowExceptions)
 			return false;
 		else
 			return true;
-	}
-
-	for (auto r: wsmMatch) {
-		if (r.length() == 0)
-			continue;
-		vResults.push_back(r);
 	}
 
 	delete[] str_wchar_t1;
@@ -724,7 +735,6 @@ bool CAddInNative::search(tVariant * paParams)
 	std::wstring str(paParams[0].pwstrVal);
 	try
 	{
-		boost::wregex* pattern;
 		if (paParams[1].wstrLen == 0)
 		{
 			if (wcsPattern.length() > 0)
@@ -733,7 +743,10 @@ bool CAddInNative::search(tVariant * paParams)
 				return true;
 		}
 		else
+		{
+			bClearPttern = true;
 			pattern = new boost::wregex(paParams[1].pwstrVal, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+		}
 
 		if (bGlobal)
 		{
@@ -768,6 +781,8 @@ bool CAddInNative::search(tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
+		if (bClearPttern && pattern != NULL)
+			delete pattern;
 		if (bThrowExceptions)
 			return false;
 		else
@@ -776,6 +791,8 @@ bool CAddInNative::search(tVariant * paParams)
 #endif
 	iCurrentPosition = -1;
 	m_PropCountOfItemsInSearchResult = vResults.size();
+	if (bClearPttern && pattern != NULL)
+		delete pattern;
 	return true;
 }
 bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
@@ -785,6 +802,9 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
 	vResults.clear();
+
+	boost::wregex* pattern = NULL;
+	bool bClearPttern = false;
 
 #if defined( __linux__ ) || defined(__APPLE__)
 	// Сконвертируем в строку с wchar_t символами
@@ -801,7 +821,6 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	std::wstring res;
 	try
 	{
-		boost::wregex* pattern;
 		if (paParams[1].wstrLen == 0)
 		{
 			if (wcsPattern.length() > 0)
@@ -810,8 +829,10 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 				return true;
 		}
 		else
+		{
+			bClearPttern = true;
 			pattern = new boost::wregex(str_wchar_t2, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
-
+		}	
 		if (bGlobal)
 			res = boost::regex_replace(str, *pattern, replacement);
 		else
@@ -823,6 +844,8 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
+		if (bClearPttern && pattern != NULL)
+			delete pattern;
 		SetLastError(e.what());
 		if (bThrowExceptions)
 			return false;
@@ -858,8 +881,10 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 				return true;
 		}
 		else
+		{
+			bClearPttern = true;
 			pattern = new boost::wregex(paParams[1].pwstrVal, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
-
+		}
 		if (bGlobal)
 			res = boost::regex_replace(str, *pattern, paParams[2].pwstrVal);
 		else
@@ -870,6 +895,9 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
+		if (bClearPttern && pattern != NULL)
+			delete pattern;
+
 		SetLastError(e.what());
 		if (bThrowExceptions)
 			return false;
@@ -884,6 +912,10 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		return true;
 	}
 #endif
+
+	if (bClearPttern && pattern != NULL)
+		delete pattern;
+
 	return false;
 }
 
@@ -891,6 +923,10 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 {
 	SetLastError("");
 	TV_VT(pvarRetValue) = VTYPE_BOOL;
+
+	boost::wregex* pattern = NULL;
+	bool bClearPttern = false;
+
 #if defined( __linux__ ) || defined(__APPLE__)
 	wchar_t* str_wchar_t1 = 0;
 	convFromShortWchar(&str_wchar_t1, paParams[0].pwstrVal, paParams[0].wstrLen + 1);
@@ -898,7 +934,6 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 	convFromShortWchar(&str_wchar_t2, paParams[1].pwstrVal, paParams[1].wstrLen + 1);
 	try
 	{
-		boost::wregex* pattern;
 		if (paParams[1].wstrLen == 0)
 		{
 			if (wcsPattern.length() > 0)
@@ -907,8 +942,10 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 				return true;
 		}
 		else
+		{
+			bClearPttern = true;
 			pattern = new boost::wregex(str_wchar_t2, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
-
+		}
 		pvarRetValue->bVal = boost::regex_match(str_wchar_t1, *pattern);
 
 	}
@@ -917,6 +954,8 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
+		if (bClearPttern && pattern != NULL)
+			delete pattern;
 		SetLastError(e.what());
 		if (bThrowExceptions)
 			return false;
@@ -946,6 +985,8 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
+		if (bClearPttern && pattern != NULL)
+			delete pattern;
 		SetLastError(e.what());
 		if (bThrowExceptions)
 			return false;
@@ -956,29 +997,21 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 	iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
 	vResults.clear();
+	if (bClearPttern && pattern != NULL)
+		delete pattern;
 	return true;
 }
 
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::wstring res = L"5";
+	std::basic_string<char16_t> res = u"6";
 
-#if defined( __linux__ ) || defined(__APPLE__)
-	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(WCHAR_T)))
+	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
-		WCHAR_T* str_WCHAR_T = 0;
-		convToShortWchar(&str_WCHAR_T, res.c_str(), res.length() + 1);
-		memcpy(pvarRetValue->pwstrVal, str_WCHAR_T, (res.length() + 1) * sizeof(WCHAR_T));
+		memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(char16_t));
 		pvarRetValue->wstrLen = res.length();
 	}
-#else
-	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(wchar_t)))
-	{
-		memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(wchar_t));
-		pvarRetValue->wstrLen = res.length();
-	}
-#endif
 }
 //---------------------------------------------------------------------------//
 long CAddInNative::findName(const wchar_t* names[], const wchar_t* name, 
