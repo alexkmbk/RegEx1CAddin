@@ -1,0 +1,2 @@
+oscript MakePackage.os
+PAUSE
