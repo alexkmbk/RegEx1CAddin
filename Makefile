@@ -12,7 +12,7 @@ ifeq ($(macos),1)
 TARGETDIR = "$(CURDIR)/macos/"
 TARGET = $(TARGETDIR)RegExMac64.so
 LIBPATHS = -Llib/macos/
-LIBS= iconv boost_regex
+LIBS= boost_regex
 else
 TARGETDIR = $(CURDIR)/linux/x$(CPU)/
 TARGET = $(TARGETDIR)RegEx$(CPU).so
