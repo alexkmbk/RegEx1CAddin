@@ -70,7 +70,7 @@
 #ifdef _WINDOWS
 #define WCHAR_T     wchar_t
 #else
-#define WCHAR_T     uint16_t
+#define WCHAR_T     char16_t
 #endif //_WINDOWS
 typedef unsigned short TYPEVAR;
 enum ENUMVAR

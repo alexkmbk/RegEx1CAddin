@@ -1,10 +1,6 @@
 ﻿
 #include "stdafx.h"
 
-#if defined( __linux__ ) || defined(__APPLE__)
-#include <iconv.h>
-#endif
-
 #include <stdio.h>
 #include <wchar.h>
 #include "AddInNative.h"
@@ -20,14 +16,10 @@ static std::vector<std::u16string> vProps;
 static std::map<std::u16string, long> mProps_ru;
 static std::vector<std::u16string> vProps_ru;
 
-static const wchar_t g_kClassNames[] = L"CAddInNative";
-static IAddInDefBase *pAsyncEvent = NULL;
+void convertUTF16ToUTF32(const char16_t *input, size_t input_size, wchar_t *output);
+unsigned int convertUTF32ToUTF16(const wchar_t *input, size_t input_size, char16_t *output);
 
-uint32_t convToShortWchar(WCHAR_T** Dest, const wchar_t* Source, uint32_t len = 0);
-uint32_t convFromShortWchar(wchar_t** Dest, const WCHAR_T* Source, uint32_t len = 0);
-uint32_t getLenShortWcharStr(const WCHAR_T* Source);
 static AppCapabilities g_capabilities = eAppCapabilitiesInvalid;
-static WcharWrapper s_names(g_kClassNames);
 
 //---------------------------------------------------------------------------//
 long GetClassObject(const WCHAR_T* wsName, IComponentBase** pInterface)
@@ -58,7 +50,8 @@ long DestroyObject(IComponentBase** pIntf)
 //---------------------------------------------------------------------------//
 const WCHAR_T* GetClassNames()
 {
-    return s_names;
+	static char16_t cls_names[] = u"CAddInNative";
+	return reinterpret_cast<WCHAR_T *>(cls_names);
 }
 //---------------------------------------------------------------------------//
 
@@ -232,11 +225,9 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 		std::wstring* wsCurrentValue = &vResults[iCurrentPosition];
 
 #if defined( __linux__ ) || defined(__APPLE__)
-		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue->length() + 1) * sizeof(WCHAR_T)))
+		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue->length() + 1) * sizeof(char32_t)))
 		{
-			WCHAR_T* str_WCHAR_T = 0;
-			convToShortWchar(&str_WCHAR_T, wsCurrentValue->c_str(), wsCurrentValue->length() + 1);
-			memcpy(pvarPropVal->pwstrVal, str_WCHAR_T, (wsCurrentValue->length() + 1) * sizeof(WCHAR_T));
+			convertUTF32ToUTF16(wsCurrentValue->c_str(), wsCurrentValue->length(), pvarPropVal->pwstrVal);
 			pvarPropVal->wstrLen = wsCurrentValue->length();
 			return true;
 		}
@@ -323,13 +314,14 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 #if defined( __linux__ ) || defined(__APPLE__)
 		// Сконвертируем в строку с wchar_t символами
 		wchar_t* str_wchar_t1 = 0;
-		convFromShortWchar(&str_wchar_t1, varPropVal->pwstrVal, varPropVal->wstrLen + 1);
-		wcsPattern.assign(str_wchar_t1);
-		rePattern.assign(str_wchar_t1, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+		str_wchar_t1 = new wchar_t[varPropVal->wstrLen];
+		convertUTF16ToUTF32(varPropVal->pwstrVal, varPropVal->wstrLen, str_wchar_t1);
+		wcsPattern.assign(str_wchar_t1, varPropVal->wstrLen);
+		rePattern.assign(str_wchar_t1, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 		delete[] str_wchar_t1;
 #else
-		wcsPattern.assign(varPropVal->pwstrVal);
-		rePattern.assign(varPropVal->pwstrVal, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+		wcsPattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen);
+		rePattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 #endif
 		return true;
 	}
@@ -616,30 +608,9 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 void CAddInNative::SetLocale(const WCHAR_T* loc)
 {
 #if !defined( __linux__ ) && !defined(__APPLE__)
-	// если платформа передала неправильное название локали, то устанавливаем системную локаль по умолчанию
-	// если вовсе не установить локаль, то STL будет поддерживать только символы латиницы!!!
-	if (_wsetlocale(LC_ALL, loc) == NULL) _wsetlocale(LC_ALL, L"");
+	_wsetlocale(LC_ALL, L"");
 #else
-	int size = 0;
-	char *mbstr = 0;
-	wchar_t *tmpLoc = 0;
-	convFromShortWchar(&tmpLoc, loc);
-	size = wcslen(tmpLoc) + 1;
-	mbstr = new char[size * MBCMAXSIZE];
-
-	if (!mbstr)
-	{
-		delete[] tmpLoc;
-		return;
-	}
-
-	memset(mbstr, 0, size * MBCMAXSIZE);
-	size = wcstombs(mbstr, tmpLoc, size * MBCMAXSIZE);
-
-	char* res = setlocale(LC_ALL, mbstr);
-	if (res == NULL) setlocale(LC_ALL, "");
-	delete[] tmpLoc;
-	delete[] mbstr;
+	setlocale(LC_ALL, "");
 #endif
 }
 
@@ -664,12 +635,12 @@ bool CAddInNative::search(tVariant * paParams)
 #if defined( __linux__ ) || defined(__APPLE__)
 	// Сконвертируем в строку с wchar_t символами
 	wchar_t* str_wchar_t1 = 0;
-	convFromShortWchar(&str_wchar_t1, paParams[0].pwstrVal, paParams[0].wstrLen + 1);
+	str_wchar_t1 = new wchar_t[paParams[0].wstrLen];
+	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str_wchar_t1);
+	std::wstring str;
+	str.assign(str_wchar_t1, paParams[0].wstrLen);
+	delete[] str_wchar_t1;
 
-	std::wstring str(str_wchar_t1);
-
-	wchar_t* str_wchar_t2 = 0;
-	convFromShortWchar(&str_wchar_t2, paParams[1].pwstrVal, paParams[1].wstrLen + 1);
 	try
 	{
 		if (paParams[1].wstrLen == 0)
@@ -682,14 +653,17 @@ bool CAddInNative::search(tVariant * paParams)
 		else
 		{
 			bClearPttern = true;
-			pattern = new boost::wregex(str_wchar_t2, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			wchar_t* str_wchar_t2 = 0;
+			str_wchar_t2 = new wchar_t[paParams[1].wstrLen];
+			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, str_wchar_t2);
+			pattern = new boost::wregex(str_wchar_t2, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			delete[] str_wchar_t2;
 		}
 
 		if (bGlobal)
 		{
 			std::wstring::const_iterator start = str.begin();
 			std::wstring::const_iterator end = str.end();
-			//boost::regex_constants::match_flag_type flags = boost::match_default;
 
 			while (start < end &&
 				boost::regex_search(start, end, wsmMatch, *pattern))
@@ -728,9 +702,6 @@ bool CAddInNative::search(tVariant * paParams)
 			return true;
 	}
 
-	delete[] str_wchar_t1;
-	delete[] str_wchar_t2;
-
 #else
 	std::wstring str(paParams[0].pwstrVal);
 	try
@@ -745,14 +716,13 @@ bool CAddInNative::search(tVariant * paParams)
 		else
 		{
 			bClearPttern = true;
-			pattern = new boost::wregex(paParams[1].pwstrVal, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 		}
 
 		if (bGlobal)
 		{
 			std::wstring::const_iterator start = str.begin();
 			std::wstring::const_iterator end = str.end();
-			//boost::regex_constants::match_flag_type flags = boost::match_default;
 
 			while (start < end &&
 				boost::regex_search(start, end, wsmMatch, *pattern))
@@ -809,15 +779,19 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 #if defined( __linux__ ) || defined(__APPLE__)
 	// Сконвертируем в строку с wchar_t символами
 	wchar_t* str_wchar_t1 = 0;
-	convFromShortWchar(&str_wchar_t1, paParams[0].pwstrVal, paParams[0].wstrLen + 1);
-	std::wstring str(str_wchar_t1);
+	str_wchar_t1 = new wchar_t[paParams[0].wstrLen];
+	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str_wchar_t1);
+	std::wstring str;
+	str.assign(str_wchar_t1, paParams[0].wstrLen);
+	delete[] str_wchar_t1;
 
 	wchar_t* str_wchar_t3 = 0;
-	convFromShortWchar(&str_wchar_t3, paParams[2].pwstrVal, paParams[2].wstrLen + 1);
-	std::wstring replacement(str_wchar_t3);
+	str_wchar_t3 = new wchar_t[paParams[2].wstrLen];
+	convertUTF16ToUTF32(paParams[2].pwstrVal, paParams[2].wstrLen, str_wchar_t3);
+	std::wstring replacement;
+	replacement.assign(str_wchar_t3, paParams[2].wstrLen);
+	delete[] str_wchar_t3;
 
-	wchar_t* str_wchar_t2 = 0;
-	convFromShortWchar(&str_wchar_t2, paParams[1].pwstrVal, paParams[1].wstrLen + 1);
 	std::wstring res;
 	try
 	{
@@ -831,7 +805,11 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		else
 		{
 			bClearPttern = true;
-			pattern = new boost::wregex(str_wchar_t2, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			wchar_t* str_wchar_t2 = 0;
+			str_wchar_t2 = new wchar_t[paParams[1].wstrLen];
+			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, str_wchar_t2);
+			pattern = new boost::wregex(str_wchar_t2, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			delete[] str_wchar_t2;
 		}	
 		if (bGlobal)
 			res = boost::regex_replace(str, *pattern, replacement);
@@ -853,16 +831,9 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 			return true;
 	}
 
-	delete[] str_wchar_t1;
-	delete[] str_wchar_t2;
-	delete[] str_wchar_t3;
-
-	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(WCHAR_T)))
+	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char32_t)))
 	{
-
-		WCHAR_T* str_WCHAR_T = 0;
-		convToShortWchar(&str_WCHAR_T, res.c_str(), res.length() + 1);
-		memcpy(pvarRetValue->pwstrVal, str_WCHAR_T, (res.length() + 1) * sizeof(WCHAR_T));
+		convertUTF32ToUTF16(res.c_str(), res.length(), pvarRetValue->pwstrVal);
 		pvarRetValue->wstrLen = res.length();
 		return true;
 }
@@ -929,9 +900,9 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 
 #if defined( __linux__ ) || defined(__APPLE__)
 	wchar_t* str_wchar_t1 = 0;
-	convFromShortWchar(&str_wchar_t1, paParams[0].pwstrVal, paParams[0].wstrLen + 1);
-	wchar_t* str_wchar_t2 = 0;
-	convFromShortWchar(&str_wchar_t2, paParams[1].pwstrVal, paParams[1].wstrLen + 1);
+	str_wchar_t1 = new wchar_t[paParams[0].wstrLen];
+	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str_wchar_t1);
+
 	try
 	{
 		if (paParams[1].wstrLen == 0)
@@ -944,7 +915,11 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		else
 		{
 			bClearPttern = true;
-			pattern = new boost::wregex(str_wchar_t2, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			wchar_t* str_wchar_t2 = 0;
+			str_wchar_t2 = new wchar_t[paParams[1].wstrLen];
+			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, str_wchar_t2);
+			pattern = new boost::wregex(str_wchar_t2, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			delete[] str_wchar_t2;
 		}
 		pvarRetValue->bVal = boost::regex_match(str_wchar_t1, *pattern);
 
@@ -962,8 +937,9 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		else
 			return true;
 	}
+
 	delete[] str_wchar_t1;
-	delete[] str_wchar_t2;
+
 #else
 	try
 	{
@@ -1005,7 +981,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"6";
+	std::basic_string<char16_t> res = u"7";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
@@ -1030,137 +1006,6 @@ long CAddInNative::findName(const wchar_t* names[], const wchar_t* name,
 }
 
 //---------------------------------------------------------------------------//
-uint32_t convToShortWchar(WCHAR_T** Dest, const wchar_t* Source, uint32_t len)
-{
-    if (!len)
-        len = ::wcslen(Source) + 1;
-
-    if (!*Dest)
-        *Dest = new WCHAR_T[len];
-
-    WCHAR_T* tmpShort = *Dest;
-    wchar_t* tmpWChar = (wchar_t*) Source;
-    uint32_t res = 0;
-
-    ::memset(*Dest, 0, len * sizeof(WCHAR_T));
-#if defined( __linux__ ) || defined(__APPLE__)
-    size_t succeed = (size_t)-1;
-    size_t f = len * sizeof(wchar_t), t = len * sizeof(WCHAR_T);
-    const char* fromCode = sizeof(wchar_t) == 2 ? "UTF-16" : "UTF-32";
-    iconv_t cd = iconv_open("UTF-16LE", fromCode);
-    if (cd != (iconv_t)-1)
-    {
-        succeed = iconv(cd, (char**)&tmpWChar, &f, (char**)&tmpShort, &t);
-        iconv_close(cd);
-        if(succeed != (size_t)-1)
-            return (uint32_t)succeed;
-    }
-#endif //__linux__
-    for (; len; --len, ++res, ++tmpWChar, ++tmpShort)
-    {
-        *tmpShort = (WCHAR_T)*tmpWChar;
-    }
-
-    return res;
-}
-//---------------------------------------------------------------------------//
-uint32_t convFromShortWchar(wchar_t** Dest, const WCHAR_T* Source, uint32_t len)
-{
-    if (!len)
-        len = getLenShortWcharStr(Source) + 1;
-
-    if (!*Dest)
-        *Dest = new wchar_t[len];
-
-    wchar_t* tmpWChar = *Dest;
-    WCHAR_T* tmpShort = (WCHAR_T*)Source;
-    uint32_t res = 0;
-
-    ::memset(*Dest, 0, len * sizeof(wchar_t));
-#if defined( __linux__ ) || defined(__APPLE__)
-    size_t succeed = (size_t)-1;
-    const char* fromCode = sizeof(wchar_t) == 2 ? "UTF-16" : "UTF-32";
-    size_t f = len * sizeof(WCHAR_T), t = len * sizeof(wchar_t);
-    iconv_t cd = iconv_open("UTF-32LE", fromCode);
-    if (cd != (iconv_t)-1)
-    {
-        succeed = iconv(cd, (char**)&tmpShort, &f, (char**)&tmpWChar, &t);
-        iconv_close(cd);
-        if(succeed != (size_t)-1)
-            return (uint32_t)succeed;
-    }
-#endif //__linux__
-    for (; len; --len, ++res, ++tmpWChar, ++tmpShort)
-    {
-        *tmpWChar = (wchar_t)*tmpShort;
-    }
-
-    return res;
-}
-//---------------------------------------------------------------------------//
-
-uint32_t getLenShortWcharStr(const WCHAR_T* Source)
-{
-    uint32_t res = 0;
-    WCHAR_T *tmpShort = (WCHAR_T*)Source;
-
-    while (*tmpShort++)
-        ++res;
-
-    return res;
-}
-//---------------------------------------------------------------------------//
-
-#ifdef LINUX_OR_MACOS
-WcharWrapper::WcharWrapper(const WCHAR_T* str) : m_str_WCHAR(NULL),
-                           m_str_wchar(NULL)
-{
-    if (str)
-    {
-        int len = getLenShortWcharStr(str);
-        m_str_WCHAR = new WCHAR_T[len + 1];
-        memset(m_str_WCHAR,   0, sizeof(WCHAR_T) * (len + 1));
-        memcpy(m_str_WCHAR, str, sizeof(WCHAR_T) * len);
-        ::convFromShortWchar(&m_str_wchar, m_str_WCHAR);
-    }
-}
-#endif
-//---------------------------------------------------------------------------//
-WcharWrapper::WcharWrapper(const wchar_t* str) :
-#ifdef LINUX_OR_MACOS
-    m_str_WCHAR(NULL),
-#endif 
-    m_str_wchar(NULL)
-{
-    if (str)
-    {
-        int len = wcslen(str);
-        m_str_wchar = new wchar_t[len + 1];
-        memset(m_str_wchar, 0, sizeof(wchar_t) * (len + 1));
-        memcpy(m_str_wchar, str, sizeof(wchar_t) * len);
-#ifdef LINUX_OR_MACOS
-        ::convToShortWchar(&m_str_WCHAR, m_str_wchar);
-#endif
-    }
-
-}
-//---------------------------------------------------------------------------//
-WcharWrapper::~WcharWrapper()
-{
-#ifdef LINUX_OR_MACOS
-    if (m_str_WCHAR)
-    {
-        delete [] m_str_WCHAR;
-        m_str_WCHAR = NULL;
-    }
-#endif
-    if (m_str_wchar)
-    {
-        delete [] m_str_wchar;
-        m_str_wchar = NULL;
-    }
-}
-//---------------------------------------------------------------------------//
 
 // Устанавливает значение переменной sErrorDescription класса CAddInNative.
 // Если переменная sErrorDescription не пустая, то значение добавляется в начало строки,
@@ -1175,4 +1020,58 @@ void CAddInNative::SetLastError(const char* error) {
 	if (sErrorDescription.length() != 0) sErrorDescription = std::string(error) + ": " + sErrorDescription;
 	else sErrorDescription = error;
 
+}
+
+
+inline int is_high_surrogate(char16_t uc) { return (uc & 0xfffffc00) == 0xd800; }
+inline int is_low_surrogate(char16_t uc) { return (uc & 0xfffffc00) == 0xdc00; }
+
+inline char32_t surrogate_to_utf32(char16_t high, char16_t low) {
+	return (high << 10) + low - 0x35fdc00;
+}
+
+// The algorithm is based on this answer:
+//https://stackoverflow.com/a/23920015/2134488
+//
+void convertUTF16ToUTF32(const char16_t *input,
+	size_t input_size,
+	wchar_t *output)
+{
+	const char16_t * const end = input + input_size;
+	while (input < end) {
+		const char16_t uc = *input++;
+		if (!((uc - 0xd800u) < 2048u)) {
+			*output++ = uc;
+		}
+		else {
+			if (is_high_surrogate(uc) && input < end && is_low_surrogate(*input))
+				*output++ = surrogate_to_utf32(uc, *input++);
+			else
+				*output++ = 0; //ERROR
+		}
+	}
+}
+
+// The algorithm is based on this answer:
+//https://stackoverflow.com/questions/955484/is-it-possible-to-convert-utf32-text-to-utf16-using-only-windows-api
+//
+unsigned int convertUTF32ToUTF16(const wchar_t *input, size_t input_size, char16_t *output)
+{
+	char16_t *start = output;
+	const wchar_t * const end = input + input_size;
+	while (input < end) {
+		const wchar_t cUTF32 = *input++;
+		if (cUTF32 < 0x10000)
+		{
+			*output++ = cUTF32;
+		}
+		else {
+			unsigned int t = cUTF32 - 0x10000;
+			wchar_t h = (((t << 12) >> 22) + 0xD800);
+			wchar_t l = (((t << 22) >> 22) + 0xDC00);
+			*output++ = h;
+			*output++ = (l & 0x0000FFFF);
+		}
+	}
+	return (output - start) * 2; // size in bytes
 }
