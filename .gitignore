@@ -15,19 +15,21 @@
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
-x64/
-x86/
 bld/
 [Bb]in/
+[Bb]ind/
+[Bb]in64/
+[Bb]ind64/
 [Oo]bj/
 [Ll]og/
-Linux/
-lib/webbrowsers
+build/
+build64/
+linux/x32/
+linux/x64/
+macos/
+lib/webbrowsers/
 MacBuild/
 Package/
-Bin64/
-in.txt
-mock.txt
 # Visual Studio 2015 cache/options directory
 .vs/
 # Uncomment if you have tasks that create the project's static files in wwwroot

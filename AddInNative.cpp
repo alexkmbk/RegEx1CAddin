@@ -297,6 +297,8 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 //---------------------------------------------------------------------------//
 bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 { 
+	SetLastError("");
+
     switch(lPropNum)
     { 
     case ePropThrowExceptions:
@@ -317,11 +319,41 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 		str_wchar_t1 = new wchar_t[varPropVal->wstrLen];
 		convertUTF16ToUTF32(varPropVal->pwstrVal, varPropVal->wstrLen, str_wchar_t1);
 		wcsPattern.assign(str_wchar_t1, varPropVal->wstrLen);
-		rePattern.assign(str_wchar_t1, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+
+		try {
+			rePattern.assign(str_wchar_t1, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+	}
+		catch (const std::exception& e)
+		{
+			vResults.clear();
+			wcsPattern.clear();
+			iCurrentPosition = -1;
+			m_PropCountOfItemsInSearchResult = 0;
+			SetLastError(e.what());
+			if (bThrowExceptions)
+				return false;
+			else
+				return true;
+		}
 		delete[] str_wchar_t1;
 #else
 		wcsPattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen);
-		rePattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+		try
+		{
+			rePattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+		}
+		catch (const std::exception& e)
+		{
+			vResults.clear();
+			wcsPattern.clear();
+			iCurrentPosition = -1;
+			m_PropCountOfItemsInSearchResult = 0;
+			SetLastError(e.what());
+			if (bThrowExceptions)
+				return false;
+			else
+				return true;
+		}
 #endif
 		return true;
 	}
@@ -630,7 +662,7 @@ bool CAddInNative::search(tVariant * paParams)
 
 	boost::wsmatch wsmMatch;
 	boost::wregex* pattern = NULL;
-	bool bClearPttern = false;
+	bool bClearPattern = false;
 
 #if defined( __linux__ ) || defined(__APPLE__)
 	// Сконвертируем в строку с wchar_t символами
@@ -652,7 +684,7 @@ bool CAddInNative::search(tVariant * paParams)
 		}
 		else
 		{
-			bClearPttern = true;
+			bClearPattern = true;
 			wchar_t* str_wchar_t2 = 0;
 			str_wchar_t2 = new wchar_t[paParams[1].wstrLen];
 			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, str_wchar_t2);
@@ -693,7 +725,7 @@ bool CAddInNative::search(tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
-		if (bClearPttern && pattern != NULL)
+		if (bClearPattern && pattern != NULL)
 			delete pattern;
 
 		if (bThrowExceptions)
@@ -715,7 +747,7 @@ bool CAddInNative::search(tVariant * paParams)
 		}
 		else
 		{
-			bClearPttern = true;
+			bClearPattern = true;
 			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 		}
 
@@ -751,7 +783,7 @@ bool CAddInNative::search(tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
-		if (bClearPttern && pattern != NULL)
+		if (bClearPattern && pattern != NULL)
 			delete pattern;
 		if (bThrowExceptions)
 			return false;
@@ -761,7 +793,7 @@ bool CAddInNative::search(tVariant * paParams)
 #endif
 	iCurrentPosition = -1;
 	m_PropCountOfItemsInSearchResult = vResults.size();
-	if (bClearPttern && pattern != NULL)
+	if (bClearPattern && pattern != NULL)
 		delete pattern;
 	return true;
 }
@@ -774,7 +806,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	vResults.clear();
 
 	boost::wregex* pattern = NULL;
-	bool bClearPttern = false;
+	bool bClearPattern = false;
 
 #if defined( __linux__ ) || defined(__APPLE__)
 	// Сконвертируем в строку с wchar_t символами
@@ -804,7 +836,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		}
 		else
 		{
-			bClearPttern = true;
+			bClearPattern = true;
 			wchar_t* str_wchar_t2 = 0;
 			str_wchar_t2 = new wchar_t[paParams[1].wstrLen];
 			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, str_wchar_t2);
@@ -822,7 +854,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
-		if (bClearPttern && pattern != NULL)
+		if (bClearPattern && pattern != NULL)
 			delete pattern;
 		SetLastError(e.what());
 		if (bThrowExceptions)
@@ -853,8 +885,8 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		}
 		else
 		{
-			bClearPttern = true;
-			pattern = new boost::wregex(paParams[1].pwstrVal, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			bClearPattern = true;
+			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 		}
 		if (bGlobal)
 			res = boost::regex_replace(str, *pattern, paParams[2].pwstrVal);
@@ -866,7 +898,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
-		if (bClearPttern && pattern != NULL)
+		if (bClearPattern && pattern != NULL)
 			delete pattern;
 
 		SetLastError(e.what());
@@ -884,7 +916,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	}
 #endif
 
-	if (bClearPttern && pattern != NULL)
+	if (bClearPattern && pattern != NULL)
 		delete pattern;
 
 	return false;
@@ -896,13 +928,13 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 	TV_VT(pvarRetValue) = VTYPE_BOOL;
 
 	boost::wregex* pattern = NULL;
-	bool bClearPttern = false;
+	bool bClearPattern = false;
 
 #if defined( __linux__ ) || defined(__APPLE__)
 	wchar_t* str_wchar_t1 = 0;
-	str_wchar_t1 = new wchar_t[paParams[0].wstrLen];
+	str_wchar_t1 = new wchar_t[paParams[0].wstrLen + 1];
 	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str_wchar_t1);
-
+	str_wchar_t1[paParams[0].wstrLen] = 0;
 	try
 	{
 		if (paParams[1].wstrLen == 0)
@@ -914,7 +946,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		}
 		else
 		{
-			bClearPttern = true;
+			bClearPattern = true;
 			wchar_t* str_wchar_t2 = 0;
 			str_wchar_t2 = new wchar_t[paParams[1].wstrLen];
 			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, str_wchar_t2);
@@ -929,7 +961,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
-		if (bClearPttern && pattern != NULL)
+		if (bClearPattern && pattern != NULL)
 			delete pattern;
 		SetLastError(e.what());
 		if (bThrowExceptions)
@@ -952,7 +984,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 				return true;
 		}
 		else
-			pattern = new boost::wregex(paParams[1].pwstrVal, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 
 		pvarRetValue->bVal = boost::regex_match(paParams[0].pwstrVal, *pattern);
 	}
@@ -961,7 +993,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		vResults.clear();
 		iCurrentPosition = -1;
 		m_PropCountOfItemsInSearchResult = 0;
-		if (bClearPttern && pattern != NULL)
+		if (bClearPattern && pattern != NULL)
 			delete pattern;
 		SetLastError(e.what());
 		if (bThrowExceptions)
@@ -973,7 +1005,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 	iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
 	vResults.clear();
-	if (bClearPttern && pattern != NULL)
+	if (bClearPattern && pattern != NULL)
 		delete pattern;
 	return true;
 }
@@ -981,7 +1013,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"7";
+	std::basic_string<char16_t> res = u"8";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
