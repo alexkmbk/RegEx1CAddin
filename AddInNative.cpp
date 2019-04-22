@@ -73,7 +73,7 @@ CAddInNative::CAddInNative()
 	bGlobal = false;
 
 #if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-	uPattern = u"";
+	uPattern.clear();
 #endif
 
 	if (mMethods.size() == 0) {
@@ -345,6 +345,7 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 		catch (const std::exception& e)
 		{
 			vResults.clear();
+			uPattern.clear();
 			isPattern = false;
 			iCurrentPosition = -1;
 			m_PropCountOfItemsInSearchResult = 0;
