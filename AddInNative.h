@@ -68,9 +68,7 @@ public:
     virtual void ADDIN_API SetLocale(const WCHAR_T* loc);
     
 private:
-    long findName(const wchar_t* names[], const wchar_t* name, const uint32_t size) const;
-
-	bool search(tVariant* paParams);
+ 	bool search(tVariant* paParams);
 	bool replace(tVariant* pvarRetValue, tVariant* paParams);
 	bool match(tVariant* pvarRetValue, tVariant* paParams);
 	void version(tVariant* pvarRetValue);
@@ -87,7 +85,10 @@ private:
 	bool bThrowExceptions;
 	bool bIgnoreCase;
 	boost::wregex rePattern;
-	std::basic_string<WCHAR> wcsPattern;
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+	std::u16string uPattern;
+#endif
+	bool isPattern;
 	bool bGlobal;
 };
 

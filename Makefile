@@ -4,9 +4,7 @@ else
 CPU = 64
 endif
 
-SOURCES=AddInNative.cpp \
-	dllmain.cpp \
-	stdafx.cpp 
+SOURCES=AddInNative.cpp 
 
 ifeq ($(macos),1)
 TARGETDIR = "$(CURDIR)/macos/"
@@ -17,12 +15,12 @@ else
 TARGETDIR = $(CURDIR)/linux/x$(CPU)/
 TARGET = $(TARGETDIR)RegEx$(CPU).so
 LIBPATHS = -Llib/linux/x$(CPU)/
-LIBS=pthread boost_regex
+LIBS= boost_regex
 endif
 
 OBJECTS=$(SOURCES:.cpp=.o)
 INCLUDES=-Iinclude
-CXXLAGS=$(CXXFLAGS) $(INCLUDES) -m$(CPU) -finput-charset=UTF-8 -fPIC -std=c++14
+CXXLAGS=$(CXXFLAGS) $(INCLUDES) -m$(CPU) -finput-charset=UTF-8 -fPIC -std=c++14 -O1
 
 all: $(TARGET)
 

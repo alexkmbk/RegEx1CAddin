@@ -16,36 +16,38 @@ static std::vector<std::u16string> vProps;
 static std::map<std::u16string, long> mProps_ru;
 static std::vector<std::u16string> vProps_ru;
 
-void convertUTF16ToUTF32(const char16_t *input, size_t input_size, wchar_t *output);
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+void convertUTF16ToUTF32(const char16_t *input, const size_t input_size, std::basic_string<wchar_t> &output);
 unsigned int convertUTF32ToUTF16(const wchar_t *input, size_t input_size, char16_t *output);
+#endif
 
 static AppCapabilities g_capabilities = eAppCapabilitiesInvalid;
 
 //---------------------------------------------------------------------------//
 long GetClassObject(const WCHAR_T* wsName, IComponentBase** pInterface)
 {
-    if(!*pInterface)
-    {
-        *pInterface= new CAddInNative;
-        return (long)*pInterface;
-    }
-    return 0;
+	if (!*pInterface)
+	{
+		*pInterface = new CAddInNative;
+		return (long)*pInterface;
+	}
+	return 0;
 }
 //---------------------------------------------------------------------------//
 AppCapabilities SetPlatformCapabilities(const AppCapabilities capabilities)
 {
-    g_capabilities = capabilities;
-    return eAppCapabilitiesLast;
+	g_capabilities = capabilities;
+	return eAppCapabilitiesLast;
 }
 //---------------------------------------------------------------------------//
 long DestroyObject(IComponentBase** pIntf)
 {
-    if(!*pIntf)
-        return -1;
+	if (!*pIntf)
+		return -1;
 
-    delete *pIntf;
-    *pIntf = 0;
-    return 0;
+	delete *pIntf;
+	*pIntf = 0;
+	return 0;
 }
 //---------------------------------------------------------------------------//
 const WCHAR_T* GetClassNames()
@@ -59,20 +61,23 @@ const WCHAR_T* GetClassNames()
 //---------------------------------------------------------------------------//
 CAddInNative::CAddInNative()
 {
-    m_iMemory = 0;
-    m_iConnect = 0;
+	m_iMemory = 0;
+	m_iConnect = 0;
 
 	iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
 	sErrorDescription = "";
 	bThrowExceptions = false;
 	bIgnoreCase = false;
-	wcsPattern.clear();
-	wcsPattern.assign(L"");
+	isPattern = false;
 	bGlobal = false;
 
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+	uPattern = u"";
+#endif
+
 	if (mMethods.size() == 0) {
-		mMethods = { 
+		mMethods = {
 		{u"matches", eMethMatches},
 		{u"ismatch", eMethIsMatch},
 		{u"next", eMethNext},
@@ -80,11 +85,11 @@ CAddInNative::CAddInNative()
 		{u"count", eMethCount},
 		{u"version", eMethVersion},
 		};
-		vMethods = { u"Matches", u"IsMatch", u"Next", u"Replace", u"Count", u"Version"};
+		vMethods = { u"Matches", u"IsMatch", u"Next", u"Replace", u"Count", u"Version" };
 	}
 
 	if (mMethods_ru.size() == 0) {
-		mMethods_ru = { 
+		mMethods_ru = {
 		{u"найтисовпадения", eMethMatches},
 		{u"совпадает", eMethIsMatch},
 		{u"следующий", eMethNext},
@@ -96,7 +101,7 @@ CAddInNative::CAddInNative()
 	}
 
 	if (mProps.size() == 0) {
-		mProps = { 
+		mProps = {
 		{u"currentvalue", ePropCurrentValue},
 		{u"ignorecase", ePropIgnoreCase},
 		{u"errordescription", ePropErrorDescription},
@@ -108,7 +113,7 @@ CAddInNative::CAddInNative()
 	}
 
 	if (mProps_ru.size() == 0) {
-		mProps_ru = { 
+		mProps_ru = {
 		{u"текущеезначение", ePropCurrentValue},
 		{u"игнорироватьрегистр", ePropIgnoreCase},
 		{u"описаниеошибки", ePropErrorDescription},
@@ -125,16 +130,16 @@ CAddInNative::~CAddInNative()
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::Init(void* pConnection)
-{ 
-    m_iConnect = (IAddInDefBase*)pConnection;
-    return m_iConnect != NULL;
+{
+	m_iConnect = (IAddInDefBase*)pConnection;
+	return m_iConnect != NULL;
 }
 //---------------------------------------------------------------------------//
 long CAddInNative::GetInfo()
-{ 
-    // Component should put supported component technology version 
-    // This component supports 2.0 version
-    return 2000; 
+{
+	// Component should put supported component technology version 
+	// This component supports 2.0 version
+	return 2000;
 }
 //---------------------------------------------------------------------------//
 void CAddInNative::Done()
@@ -145,7 +150,7 @@ void CAddInNative::Done()
 // ILanguageExtenderBase
 //---------------------------------------------------------------------------//
 bool CAddInNative::RegisterExtensionAs(WCHAR_T** wsExtensionName)
-{ 
+{
 	char16_t name[] = u"RegEx";
 
 	if (!m_iMemory || !m_iMemory->AllocMemory(reinterpret_cast<void **>(wsExtensionName), sizeof(name))) {
@@ -158,12 +163,12 @@ bool CAddInNative::RegisterExtensionAs(WCHAR_T** wsExtensionName)
 }
 //---------------------------------------------------------------------------//
 long CAddInNative::GetNProps()
-{ 
-    return ePropLast;
+{
+	return ePropLast;
 }
 //---------------------------------------------------------------------------//
 long CAddInNative::FindProp(const WCHAR_T* wsPropName)
-{ 
+{
 	std::basic_string<char16_t> usPropName = (char16_t*)(wsPropName);
 	std::transform(usPropName.begin(), usPropName.end(), usPropName.begin(), ::towlower);
 
@@ -180,23 +185,23 @@ long CAddInNative::FindProp(const WCHAR_T* wsPropName)
 
 //---------------------------------------------------------------------------//
 const WCHAR_T* CAddInNative::GetPropName(long lPropNum, long lPropAlias)
-{ 
-    if (lPropNum >= ePropLast)
-        return NULL;
+{
+	if (lPropNum >= ePropLast)
+		return NULL;
 
 	std::basic_string<char16_t> *usCurrentName;
 
-    switch(lPropAlias)
-    {
-    case 0: // First language
+	switch (lPropAlias)
+	{
+	case 0: // First language
 		usCurrentName = &vProps[lPropNum];
-        break;
-    case 1: // Second language
+		break;
+	case 1: // Second language
 		usCurrentName = &vProps_ru[lPropNum];
 		break;
 	default:
-        return 0;
-    }
+		return 0;
+	}
 
 	if (usCurrentName->length() == 0) {
 		return nullptr;
@@ -224,9 +229,12 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 		TV_VT(pvarPropVal) = VTYPE_PWSTR;
 		std::wstring* wsCurrentValue = &vResults[iCurrentPosition];
 
-#if defined( __linux__ ) || defined(__APPLE__)
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue->length() + 1) * sizeof(char32_t)))
 		{
+			memcpy(pvarPropVal->pwstrVal, wsCurrentValue->c_str(), (wsCurrentValue->length() + 1) * sizeof(wchar_t));
+			pvarPropVal->wstrLen = wsCurrentValue->length();
+
 			convertUTF32ToUTF16(wsCurrentValue->c_str(), wsCurrentValue->length(), pvarPropVal->pwstrVal);
 			pvarPropVal->wstrLen = wsCurrentValue->length();
 			return true;
@@ -267,13 +275,23 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 	}
 	case ePropPattern:
 	{
-		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pstrVal, (wcsPattern.length() + 1) * sizeof(WCHAR)))
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (uPattern.length() + 1) * sizeof(WCHAR)))
 		{
-			memcpy(pvarPropVal->pwstrVal, wcsPattern.c_str(), wcsPattern.length() * sizeof(WCHAR));
+			memcpy(pvarPropVal->pwstrVal, uPattern.c_str(), uPattern.length() * sizeof(WCHAR));
 			TV_VT(pvarPropVal) = VTYPE_PWSTR;
-			pvarPropVal->wstrLen = wcsPattern.length();
+			pvarPropVal->wstrLen = uPattern.length();
+			return true;
+	}
+#else
+		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (rePattern.str().length() + 1) * sizeof(WCHAR)))
+		{
+			memcpy(pvarPropVal->pwstrVal, rePattern.str().c_str(), rePattern.str().length() * sizeof(WCHAR));
+			TV_VT(pvarPropVal) = VTYPE_PWSTR;
+			pvarPropVal->wstrLen = rePattern.str().length();
 			return true;
 		}
+#endif
 		else
 		{
 			TV_VT(pvarPropVal) = VTYPE_PWSTR;
@@ -296,12 +314,12 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
-{ 
+{
 	SetLastError("");
 
-    switch(lPropNum)
-    { 
-    case ePropThrowExceptions:
+	switch (lPropNum)
+	{
+	case ePropThrowExceptions:
 	{
 		if (TV_VT(varPropVal) != VTYPE_BOOL)
 			return false;
@@ -313,20 +331,21 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 		return true;
 	}
 	case ePropPattern: {
-#if defined( __linux__ ) || defined(__APPLE__)
-		// Сконвертируем в строку с wchar_t символами
-		wchar_t* str_wchar_t1 = 0;
-		str_wchar_t1 = new wchar_t[varPropVal->wstrLen];
-		convertUTF16ToUTF32(varPropVal->pwstrVal, varPropVal->wstrLen, str_wchar_t1);
-		wcsPattern.assign(str_wchar_t1, varPropVal->wstrLen);
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+		
+		uPattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen);
 
+		// Сконвертируем в строку с wchar_t символами
+		std::wstring wcsPattern;
+		wcsPattern.resize(varPropVal->wstrLen);
+		convertUTF16ToUTF32(varPropVal->pwstrVal, varPropVal->wstrLen, wcsPattern);
 		try {
-			rePattern.assign(str_wchar_t1, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
-	}
+			rePattern.assign(wcsPattern, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+		}
 		catch (const std::exception& e)
 		{
 			vResults.clear();
-			wcsPattern.clear();
+			isPattern = false;
 			iCurrentPosition = -1;
 			m_PropCountOfItemsInSearchResult = 0;
 			SetLastError(e.what());
@@ -335,9 +354,7 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 			else
 				return true;
 		}
-		delete[] str_wchar_t1;
 #else
-		wcsPattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen);
 		try
 		{
 			rePattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
@@ -345,7 +362,7 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 		catch (const std::exception& e)
 		{
 			vResults.clear();
-			wcsPattern.clear();
+			isPattern = false;
 			iCurrentPosition = -1;
 			m_PropCountOfItemsInSearchResult = 0;
 			SetLastError(e.what());
@@ -355,6 +372,7 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 				return true;
 		}
 #endif
+		isPattern = true;
 		return true;
 	}
 	case ePropGlobal:
@@ -362,19 +380,19 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 		bGlobal = TV_BOOL(varPropVal);
 		return true;
 	}
-    default:
-        return false;
-    }
+	default:
+		return false;
+	}
 
-    return false;
+	return false;
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::IsPropReadable(const long lPropNum)
-{ 
-    switch(lPropNum)
-    { 
-    case ePropCurrentValue:
-        return true;
+{
+	switch (lPropNum)
+	{
+	case ePropCurrentValue:
+		return true;
 	case ePropErrorDescription:
 		return true;
 	case ePropIgnoreCase:
@@ -385,35 +403,35 @@ bool CAddInNative::IsPropReadable(const long lPropNum)
 		return true;
 	case ePropGlobal:
 		return true;
-    default:
-        return false;
-    }
+	default:
+		return false;
+	}
 
-    return false;
+	return false;
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::IsPropWritable(const long lPropNum)
 {
-    switch(lPropNum)
-    { 
-    case ePropIgnoreCase:
-        return true;
-    case ePropThrowExceptions:
-        return true;
+	switch (lPropNum)
+	{
+	case ePropIgnoreCase:
+		return true;
+	case ePropThrowExceptions:
+		return true;
 	case ePropPattern:
 		return true;
 	case ePropGlobal:
 		return true;
-    default:
-        return false;
-    }
+	default:
+		return false;
+	}
 
-    return false;
+	return false;
 }
 //---------------------------------------------------------------------------//
 long CAddInNative::GetNMethods()
-{ 
-    return eMethLast;
+{
+	return eMethLast;
 }
 //---------------------------------------------------------------------------//
 long CAddInNative::FindMethod(const WCHAR_T* wsMethodName)
@@ -425,7 +443,7 @@ long CAddInNative::FindMethod(const WCHAR_T* wsMethodName)
 	auto it = mMethods.find(usMethodName);
 	if (it != mMethods.end())
 		return it->second;
-	
+
 	it = mMethods_ru.find(usMethodName);
 	if (it != mMethods_ru.end())
 		return it->second;
@@ -434,7 +452,7 @@ long CAddInNative::FindMethod(const WCHAR_T* wsMethodName)
 }
 //---------------------------------------------------------------------------//
 const WCHAR_T* CAddInNative::GetMethodName(const long lMethodNum, const long lMethodAlias)
-{ 
+{
 
 	if (lMethodNum >= eMethLast)
 		return NULL;
@@ -467,27 +485,27 @@ const WCHAR_T* CAddInNative::GetMethodName(const long lMethodNum, const long lMe
 }
 //---------------------------------------------------------------------------//
 long CAddInNative::GetNParams(const long lMethodNum)
-{ 
-    switch(lMethodNum)
-    { 
-    case eMethMatches:
-        return 2;
-    case eMethIsMatch:
-        return 2;
+{
+	switch (lMethodNum)
+	{
+	case eMethMatches:
+		return 2;
+	case eMethIsMatch:
+		return 2;
 	case eMethReplace:
 		return 3;
-    default:
-        return 0;
-    }
-    
-    return 0;
+	default:
+		return 0;
+	}
+
+	return 0;
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::GetParamDefValue(const long lMethodNum, const long lParamNum,
-                        tVariant *pvarParamDefValue)
-{ 
-    switch(lMethodNum)
-    { 
+	tVariant *pvarParamDefValue)
+{
+	switch (lMethodNum)
+	{
 	case eMethMatches:
 	{
 		if (lParamNum == 1)
@@ -497,14 +515,14 @@ bool CAddInNative::GetParamDefValue(const long lMethodNum, const long lParamNum,
 			return true;
 		}
 	}
-    case eMethIsMatch:
+	case eMethIsMatch:
 		if (lParamNum == 1)
 		{
 			TV_VT(pvarParamDefValue) = VTYPE_PWSTR;
 			pvarParamDefValue->wstrLen = 0;
 			return true;
 		}
-    case eMethNext:
+	case eMethNext:
 		break;
 	case eMethReplace:
 		if (lParamNum == 1)
@@ -521,28 +539,28 @@ bool CAddInNative::GetParamDefValue(const long lMethodNum, const long lParamNum,
 	}
 
 	TV_VT(pvarParamDefValue) = VTYPE_EMPTY;
-    return false;
-} 
+	return false;
+}
 //---------------------------------------------------------------------------//
 bool CAddInNative::HasRetVal(const long lMethodNum)
-{ 
-    switch(lMethodNum)
-    { 
-    case eMethNext:
+{
+	switch (lMethodNum)
+	{
+	case eMethNext:
 		return true;
 	case eMethReplace:
 		return true;
-    case eMethIsMatch:
-        return true;
+	case eMethIsMatch:
+		return true;
 	case eMethCount:
 		return true;
 	case eMethVersion:
 		return true;
-    default:
-        return false;
-    }
+	default:
+		return false;
+	}
 
-    return false;
+	return false;
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::CallAsProc(const long lMethodNum,
@@ -578,8 +596,8 @@ bool CAddInNative::CallAsProc(const long lMethodNum,
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::CallAsFunc(const long lMethodNum,
-                tVariant* pvarRetValue, tVariant* paParams, const long lSizeArray)
-{ 
+	tVariant* pvarRetValue, tVariant* paParams, const long lSizeArray)
+{
 	switch (lMethodNum)
 	{
 		// Method acceps one argument of type BinaryData ant returns its copy
@@ -608,7 +626,7 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		}
 	}
 	break;
-	case eMethCount:{
+	case eMethCount: {
 		TV_VT(pvarRetValue) = VTYPE_I4;
 		pvarRetValue->lVal = m_PropCountOfItemsInSearchResult;
 		return true;
@@ -639,7 +657,7 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 // 
 void CAddInNative::SetLocale(const WCHAR_T* loc)
 {
-#if !defined( __linux__ ) && !defined(__APPLE__)
+#if !defined( __linux__ ) && !defined(__APPLE__) && !defined(__ANDROID__)
 	_wsetlocale(LC_ALL, L"");
 #else
 	setlocale(LC_ALL, "");
@@ -651,8 +669,8 @@ void CAddInNative::SetLocale(const WCHAR_T* loc)
 //---------------------------------------------------------------------------//
 bool CAddInNative::setMemManager(void* mem)
 {
-    m_iMemory = (IMemoryManager*)mem;
-    return m_iMemory != 0;
+	m_iMemory = (IMemoryManager*)mem;
+	return m_iMemory != 0;
 }
 
 bool CAddInNative::search(tVariant * paParams)
@@ -664,20 +682,16 @@ bool CAddInNative::search(tVariant * paParams)
 	boost::wregex* pattern = NULL;
 	bool bClearPattern = false;
 
-#if defined( __linux__ ) || defined(__APPLE__)
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 	// Сконвертируем в строку с wchar_t символами
-	wchar_t* str_wchar_t1 = 0;
-	str_wchar_t1 = new wchar_t[paParams[0].wstrLen];
-	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str_wchar_t1);
 	std::wstring str;
-	str.assign(str_wchar_t1, paParams[0].wstrLen);
-	delete[] str_wchar_t1;
-
+	str.resize(paParams[0].wstrLen);
+	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str);
 	try
 	{
 		if (paParams[1].wstrLen == 0)
 		{
-			if (wcsPattern.length() > 0)
+			if (isPattern)
 				pattern = &rePattern;
 			else
 				return true;
@@ -685,11 +699,10 @@ bool CAddInNative::search(tVariant * paParams)
 		else
 		{
 			bClearPattern = true;
-			wchar_t* str_wchar_t2 = 0;
-			str_wchar_t2 = new wchar_t[paParams[1].wstrLen];
-			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, str_wchar_t2);
-			pattern = new boost::wregex(str_wchar_t2, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
-			delete[] str_wchar_t2;
+			std::wstring regex_str;
+			regex_str.resize(paParams[1].wstrLen);
+			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, regex_str);
+			pattern = new boost::wregex(regex_str, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 		}
 
 		if (bGlobal)
@@ -706,7 +719,7 @@ bool CAddInNative::search(tVariant * paParams)
 					vResults.push_back(r);
 				}
 				start = wsmMatch[0].second;
-}
+			}
 		}
 		else
 		{
@@ -735,12 +748,13 @@ bool CAddInNative::search(tVariant * paParams)
 	}
 
 #else
-	std::wstring str(paParams[0].pwstrVal);
+	std::wstring str;
+	str.assign(paParams[0].pwstrVal, paParams[0].wstrLen);
 	try
 	{
 		if (paParams[1].wstrLen == 0)
 		{
-			if (wcsPattern.length() > 0)
+			if (isPattern)
 				pattern = &rePattern;
 			else
 				return true;
@@ -788,7 +802,7 @@ bool CAddInNative::search(tVariant * paParams)
 		if (bThrowExceptions)
 			return false;
 		else
-		return true;
+			return true;
 	}
 #endif
 	iCurrentPosition = -1;
@@ -808,28 +822,21 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	boost::wregex* pattern = NULL;
 	bool bClearPattern = false;
 
-#if defined( __linux__ ) || defined(__APPLE__)
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 	// Сконвертируем в строку с wchar_t символами
-	wchar_t* str_wchar_t1 = 0;
-	str_wchar_t1 = new wchar_t[paParams[0].wstrLen];
-	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str_wchar_t1);
 	std::wstring str;
-	str.assign(str_wchar_t1, paParams[0].wstrLen);
-	delete[] str_wchar_t1;
+	str.resize(paParams[0].wstrLen);
+	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str);
 
-	wchar_t* str_wchar_t3 = 0;
-	str_wchar_t3 = new wchar_t[paParams[2].wstrLen];
-	convertUTF16ToUTF32(paParams[2].pwstrVal, paParams[2].wstrLen, str_wchar_t3);
 	std::wstring replacement;
-	replacement.assign(str_wchar_t3, paParams[2].wstrLen);
-	delete[] str_wchar_t3;
-
+	replacement.resize(paParams[2].wstrLen);
+	convertUTF16ToUTF32(paParams[2].pwstrVal, paParams[2].wstrLen, replacement);
 	std::wstring res;
 	try
 	{
 		if (paParams[1].wstrLen == 0)
 		{
-			if (wcsPattern.length() > 0)
+			if (isPattern)
 				pattern = &rePattern;
 			else
 				return true;
@@ -837,12 +844,11 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		else
 		{
 			bClearPattern = true;
-			wchar_t* str_wchar_t2 = 0;
-			str_wchar_t2 = new wchar_t[paParams[1].wstrLen];
-			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, str_wchar_t2);
-			pattern = new boost::wregex(str_wchar_t2, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
-			delete[] str_wchar_t2;
-		}	
+			std::wstring pattern_str;
+			pattern_str.resize(paParams[1].wstrLen);
+			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, pattern_str);
+			pattern = new boost::wregex(pattern_str, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+		}
 		if (bGlobal)
 			res = boost::regex_replace(str, *pattern, replacement);
 		else
@@ -868,17 +874,18 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		convertUTF32ToUTF16(res.c_str(), res.length(), pvarRetValue->pwstrVal);
 		pvarRetValue->wstrLen = res.length();
 		return true;
-}
+	}
 #else
 
-	std::wstring str(paParams[0].pwstrVal);
+	std::wstring str;
+	str.assign(paParams[0].pwstrVal, paParams[0].wstrLen);
 	std::wstring res;
 	try
 	{
 		boost::wregex* pattern;
 		if (paParams[1].wstrLen == 0)
 		{
-			if (wcsPattern.length() > 0)
+			if (isPattern)
 				pattern = &rePattern;
 			else
 				return true;
@@ -930,16 +937,15 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 	boost::wregex* pattern = NULL;
 	bool bClearPattern = false;
 
-#if defined( __linux__ ) || defined(__APPLE__)
-	wchar_t* str_wchar_t1 = 0;
-	str_wchar_t1 = new wchar_t[paParams[0].wstrLen + 1];
-	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str_wchar_t1);
-	str_wchar_t1[paParams[0].wstrLen] = 0;
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+	std::wstring str;
+	str.resize(paParams[0].wstrLen);
+	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str);
 	try
 	{
 		if (paParams[1].wstrLen == 0)
 		{
-			if (wcsPattern.length() > 0)
+			if (isPattern)
 				pattern = &rePattern;
 			else
 				return true;
@@ -947,13 +953,12 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		else
 		{
 			bClearPattern = true;
-			wchar_t* str_wchar_t2 = 0;
-			str_wchar_t2 = new wchar_t[paParams[1].wstrLen];
-			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, str_wchar_t2);
-			pattern = new boost::wregex(str_wchar_t2, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
-			delete[] str_wchar_t2;
+			std::wstring pattern_str;
+			pattern_str.resize(paParams[1].wstrLen);
+			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, pattern_str);
+			pattern = new boost::wregex(pattern_str, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 		}
-		pvarRetValue->bVal = boost::regex_match(str_wchar_t1, *pattern);
+		pvarRetValue->bVal = boost::regex_match(str, *pattern);
 
 	}
 	catch (const std::exception& e)
@@ -970,15 +975,13 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 			return true;
 	}
 
-	delete[] str_wchar_t1;
-
 #else
 	try
 	{
 		boost::wregex* pattern;
 		if (paParams[1].wstrLen == 0)
 		{
-			if (wcsPattern.length() > 0)
+			if (isPattern)
 				pattern = &rePattern;
 			else
 				return true;
@@ -1013,28 +1016,13 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"8";
+	std::basic_string<char16_t> res = u"9";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
 		memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(char16_t));
 		pvarRetValue->wstrLen = res.length();
 	}
-}
-//---------------------------------------------------------------------------//
-long CAddInNative::findName(const wchar_t* names[], const wchar_t* name, 
-                        const uint32_t size) const
-{
-    long ret = -1;
-    for (uint32_t i = 0; i < size; i++)
-    {
-        if (!wcscmp(names[i], name))
-        {
-            ret = i;
-            break;
-        }
-    }
-    return ret;
 }
 
 //---------------------------------------------------------------------------//
@@ -1054,6 +1042,7 @@ void CAddInNative::SetLastError(const char* error) {
 
 }
 
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 
 inline int is_high_surrogate(char16_t uc) { return (uc & 0xfffffc00) == 0xd800; }
 inline int is_low_surrogate(char16_t uc) { return (uc & 0xfffffc00) == 0xdc00; }
@@ -1066,20 +1055,23 @@ inline char32_t surrogate_to_utf32(char16_t high, char16_t low) {
 //https://stackoverflow.com/a/23920015/2134488
 //
 void convertUTF16ToUTF32(const char16_t *input,
-	size_t input_size,
-	wchar_t *output)
+	const size_t input_size,
+	std::basic_string<wchar_t> &output)
 {
+	int i = 0;
 	const char16_t * const end = input + input_size;
 	while (input < end) {
 		const char16_t uc = *input++;
 		if (!((uc - 0xd800u) < 2048u)) {
-			*output++ = uc;
+			output[i++] = uc;
 		}
 		else {
-			if (is_high_surrogate(uc) && input < end && is_low_surrogate(*input))
-				*output++ = surrogate_to_utf32(uc, *input++);
-			else
-				*output++ = 0; //ERROR
+			if (is_high_surrogate(uc) && input < end && is_low_surrogate(*input)) {
+				output[i++] = (wchar_t)surrogate_to_utf32(uc, *input++);
+			}
+			else {
+				output[i++] = 0; //ERROR
+			}
 		}
 	}
 }
@@ -1107,3 +1099,5 @@ unsigned int convertUTF32ToUTF16(const wchar_t *input, size_t input_size, char16
 	}
 	return (output - start) * 2; // size in bytes
 }
+
+#endif
