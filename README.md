@@ -8,13 +8,13 @@
 В текущей версии нет совместимости с Windows XP (совместимость была до версии 4).
 
 Текущая версия собрана для следующих платформ:
-Windows 32bit 
-Windows 64bit 
-Linux 32bit 
-Linux 64bit 
-MacOS 64bit
-Android ARMv7-A
-Android x86
+Windows 32bit    
+Windows 64bit    
+Linux 32bit   
+Linux 64bit   
+MacOS 64bit   
+Android ARMv7-A   
+Android x86   
 
 Тестировалось на платформе 8.3.12.1567 (Windows 7, Windows Server 2008 R2, Ubuntu 14 32-64bit, MacOS Sierra 10.12)
 
