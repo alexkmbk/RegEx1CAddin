@@ -1,5 +1,6 @@
-﻿
+﻿#if !defined( __linux__ ) && !defined(__APPLE__) && !defined(__ANDROID__)
 #include "stdafx.h"
+#endif
 
 #include <stdio.h>
 #include <wchar.h>
@@ -17,7 +18,7 @@ static std::map<std::u16string, long> mProps_ru;
 static std::vector<std::u16string> vProps_ru;
 
 #if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-void convertUTF16ToUTF32(const char16_t *input, const size_t input_size, std::basic_string<wchar_t> &output);
+void convertUTF16ToUTF32(char16_t *input, const size_t input_size, std::basic_string<wchar_t> &output);
 unsigned int convertUTF32ToUTF16(const wchar_t *input, size_t input_size, char16_t *output);
 #endif
 
@@ -52,7 +53,7 @@ long DestroyObject(IComponentBase** pIntf)
 //---------------------------------------------------------------------------//
 const WCHAR_T* GetClassNames()
 {
-	static char16_t cls_names[] = u"CAddInNative";
+	static char16_t cls_names[] = u"RegEx";
 	return reinterpret_cast<WCHAR_T *>(cls_names);
 }
 //---------------------------------------------------------------------------//
@@ -138,8 +139,8 @@ bool CAddInNative::Init(void* pConnection)
 long CAddInNative::GetInfo()
 {
 	// Component should put supported component technology version 
-	// This component supports 2.0 version
-	return 2000;
+	// This component supports 2.1 version
+	return 2100;
 }
 //---------------------------------------------------------------------------//
 void CAddInNative::Done()
@@ -235,7 +236,7 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 			memcpy(pvarPropVal->pwstrVal, wsCurrentValue->c_str(), (wsCurrentValue->length() + 1) * sizeof(wchar_t));
 			pvarPropVal->wstrLen = wsCurrentValue->length();
 
-			convertUTF32ToUTF16(wsCurrentValue->c_str(), wsCurrentValue->length(), pvarPropVal->pwstrVal);
+			convertUTF32ToUTF16(wsCurrentValue->c_str(), wsCurrentValue->length(), (char16_t *)pvarPropVal->pwstrVal);
 			pvarPropVal->wstrLen = wsCurrentValue->length();
 			return true;
 		}
@@ -282,7 +283,7 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 			TV_VT(pvarPropVal) = VTYPE_PWSTR;
 			pvarPropVal->wstrLen = uPattern.length();
 			return true;
-	}
+		}
 #else
 		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (rePattern.str().length() + 1) * sizeof(WCHAR)))
 		{
@@ -332,13 +333,13 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 	}
 	case ePropPattern: {
 #if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-		
-		uPattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen);
+
+		uPattern.assign((char16_t *)varPropVal->pwstrVal, varPropVal->wstrLen);
 
 		// Сконвертируем в строку с wchar_t символами
 		std::wstring wcsPattern;
 		wcsPattern.resize(varPropVal->wstrLen);
-		convertUTF16ToUTF32(varPropVal->pwstrVal, varPropVal->wstrLen, wcsPattern);
+		convertUTF16ToUTF32((char16_t *)varPropVal->pwstrVal, varPropVal->wstrLen, wcsPattern);
 		try {
 			rePattern.assign(wcsPattern, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 		}
@@ -687,7 +688,7 @@ bool CAddInNative::search(tVariant * paParams)
 	// Сконвертируем в строку с wchar_t символами
 	std::wstring str;
 	str.resize(paParams[0].wstrLen);
-	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str);
+	convertUTF16ToUTF32((char16_t *)paParams[0].pwstrVal, paParams[0].wstrLen, str);
 	try
 	{
 		if (paParams[1].wstrLen == 0)
@@ -702,7 +703,7 @@ bool CAddInNative::search(tVariant * paParams)
 			bClearPattern = true;
 			std::wstring regex_str;
 			regex_str.resize(paParams[1].wstrLen);
-			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, regex_str);
+			convertUTF16ToUTF32((char16_t *)paParams[1].pwstrVal, paParams[1].wstrLen, regex_str);
 			pattern = new boost::wregex(regex_str, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 		}
 
@@ -827,11 +828,11 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	// Сконвертируем в строку с wchar_t символами
 	std::wstring str;
 	str.resize(paParams[0].wstrLen);
-	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str);
+	convertUTF16ToUTF32((char16_t *)paParams[0].pwstrVal, paParams[0].wstrLen, str);
 
 	std::wstring replacement;
 	replacement.resize(paParams[2].wstrLen);
-	convertUTF16ToUTF32(paParams[2].pwstrVal, paParams[2].wstrLen, replacement);
+	convertUTF16ToUTF32((char16_t *)paParams[2].pwstrVal, paParams[2].wstrLen, replacement);
 	std::wstring res;
 	try
 	{
@@ -847,7 +848,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 			bClearPattern = true;
 			std::wstring pattern_str;
 			pattern_str.resize(paParams[1].wstrLen);
-			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, pattern_str);
+			convertUTF16ToUTF32((char16_t *)paParams[1].pwstrVal, paParams[1].wstrLen, pattern_str);
 			pattern = new boost::wregex(pattern_str, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 		}
 		if (bGlobal)
@@ -872,7 +873,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char32_t)))
 	{
-		convertUTF32ToUTF16(res.c_str(), res.length(), pvarRetValue->pwstrVal);
+		convertUTF32ToUTF16(res.c_str(), res.length(), (char16_t *)pvarRetValue->pwstrVal);
 		pvarRetValue->wstrLen = res.length();
 		return true;
 	}
@@ -941,7 +942,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 #if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 	std::wstring str;
 	str.resize(paParams[0].wstrLen);
-	convertUTF16ToUTF32(paParams[0].pwstrVal, paParams[0].wstrLen, str);
+	convertUTF16ToUTF32((char16_t *)paParams[0].pwstrVal, paParams[0].wstrLen, str);
 	try
 	{
 		if (paParams[1].wstrLen == 0)
@@ -956,7 +957,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 			bClearPattern = true;
 			std::wstring pattern_str;
 			pattern_str.resize(paParams[1].wstrLen);
-			convertUTF16ToUTF32(paParams[1].pwstrVal, paParams[1].wstrLen, pattern_str);
+			convertUTF16ToUTF32((char16_t *)paParams[1].pwstrVal, paParams[1].wstrLen, pattern_str);
 			pattern = new boost::wregex(pattern_str, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
 		}
 		pvarRetValue->bVal = boost::regex_match(str, *pattern);
@@ -1037,7 +1038,7 @@ void CAddInNative::version(tVariant * pvarRetValue)
 //
 void CAddInNative::SetLastError(const char* error) {
 
-	if (error == "") sErrorDescription.clear();
+	if (error == 0) sErrorDescription.clear();
 	if (sErrorDescription.length() != 0) sErrorDescription = std::string(error) + ": " + sErrorDescription;
 	else sErrorDescription = error;
 
@@ -1055,7 +1056,7 @@ inline char32_t surrogate_to_utf32(char16_t high, char16_t low) {
 // The algorithm is based on this answer:
 //https://stackoverflow.com/a/23920015/2134488
 //
-void convertUTF16ToUTF32(const char16_t *input,
+void convertUTF16ToUTF32(char16_t *input,
 	const size_t input_size,
 	std::basic_string<wchar_t> &output)
 {
