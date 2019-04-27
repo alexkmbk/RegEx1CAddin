@@ -12,7 +12,9 @@ Windows 32bit
 Windows 64bit 
 Linux 32bit 
 Linux 64bit 
-MacOS 64bit 
+MacOS 64bit
+Android ARMv7-A
+Android x86
 
 Тестировалось на платформе 8.3.12.1567 (Windows 7, Windows Server 2008 R2, Ubuntu 14 32-64bit, MacOS Sierra 10.12)
 
@@ -23,6 +25,8 @@ MacOS 64bit
 Под Linux: GCC 6
 
 Под Mac OS: Clang 9
+
+Под Android: Android Studio NDK 19.2 
 
 Использовалась статическая сборка, поэтому компонента не требует установки каких-либо дополнительных библиотек.
 
