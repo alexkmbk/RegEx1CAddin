@@ -26,9 +26,7 @@ build/
 build64/
 linux/x32/
 linux/x64/
-android/arm/
-android/x86/
-android/
+include/android/boost/
 CMakeTemp/
 macos/
 tests/
