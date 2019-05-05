@@ -15,7 +15,7 @@ Linux 64bit
 MacOS 64bit   
 Android ARMv7-A   
 Android x86   
-
+Google Chrome (Linux)   
 Тестировалось на платформе 8.3.12.1567 (Windows 7, Windows Server 2008 R2, Ubuntu 14 32-64bit, MacOS Sierra 10.12, Android 8)
 
 Сборка осуществлялась с использованием следующих инструментов:
