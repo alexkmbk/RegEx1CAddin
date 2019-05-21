@@ -228,14 +228,18 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 	case ePropCurrentValue:
 	{
 		TV_VT(pvarPropVal) = VTYPE_PWSTR;
-		std::wstring* wsCurrentValue = &vResults[iCurrentPosition];
+		std::wstring* wsCurrentValue;
+		if (vResults.size() == 0)
+		{
+			std::wstring emptyStr = L"";
+			wsCurrentValue = &emptyStr;
+		}
+		else
+			wsCurrentValue = &vResults[iCurrentPosition];
 
 #if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue->length() + 1) * sizeof(char32_t)))
 		{
-			memcpy(pvarPropVal->pwstrVal, wsCurrentValue->c_str(), (wsCurrentValue->length() + 1) * sizeof(wchar_t));
-			pvarPropVal->wstrLen = wsCurrentValue->length();
-
 			convertUTF32ToUTF16(wsCurrentValue->c_str(), wsCurrentValue->length(), (char16_t *)pvarPropVal->pwstrVal);
 			pvarPropVal->wstrLen = wsCurrentValue->length();
 			return true;
@@ -1018,7 +1022,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"9";
+	std::basic_string<char16_t> res = u"10";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{

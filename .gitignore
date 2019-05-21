@@ -22,6 +22,8 @@ bld/
 [Bb]ind64/
 [Oo]bj/
 [Ll]og/
+AddInChrome/
+AndroidPackage/
 build/
 build64/
 linux/x32/
