@@ -683,6 +683,7 @@ bool CAddInNative::search(tVariant * paParams)
 {
 	SetLastError("");
 	vResults.clear();
+	iCurrentPosition = -1;
 
 	boost::wsmatch wsmMatch;
 	boost::wregex* pattern = NULL;
