@@ -65,7 +65,7 @@ CAddInNative::CAddInNative()
 	m_iMemory = 0;
 	m_iConnect = 0;
 
-	iCurrentPosition = 0;
+	iCurrentPosition = -1;
 	m_PropCountOfItemsInSearchResult = 0;
 	sErrorDescription = "";
 	bThrowExceptions = false;
@@ -229,7 +229,7 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 	{
 		TV_VT(pvarPropVal) = VTYPE_PWSTR;
 		std::wstring* wsCurrentValue;
-		if (vResults.size() == 0)
+		if (vResults.size() == 0 || iCurrentPosition == -1)
 		{
 			std::wstring emptyStr = L"";
 			wsCurrentValue = &emptyStr;

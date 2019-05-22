@@ -78,9 +78,9 @@ private:
     IAddInDefBase      *m_iConnect;
     IMemoryManager     *m_iMemory;
 
-	uint32_t m_PropCountOfItemsInSearchResult;
+	int m_PropCountOfItemsInSearchResult;
 	std::vector<std::wstring> vResults;
-	uint32_t iCurrentPosition;
+	int iCurrentPosition;
 	std::string sErrorDescription;
 	bool bThrowExceptions;
 	bool bIgnoreCase;
