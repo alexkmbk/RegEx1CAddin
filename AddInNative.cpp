@@ -345,7 +345,7 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 		wcsPattern.resize(varPropVal->wstrLen);
 		convertUTF16ToUTF32((char16_t *)varPropVal->pwstrVal, varPropVal->wstrLen, wcsPattern);
 		try {
-			rePattern.assign(wcsPattern, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			rePattern.assign(wcsPattern, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
 		}
 		catch (const std::exception& e)
 		{
@@ -363,7 +363,7 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 #else
 		try
 		{
-			rePattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			rePattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
 		}
 		catch (const std::exception& e)
 		{
@@ -709,7 +709,7 @@ bool CAddInNative::search(tVariant * paParams)
 			std::wstring regex_str;
 			regex_str.resize(paParams[1].wstrLen);
 			convertUTF16ToUTF32((char16_t *)paParams[1].pwstrVal, paParams[1].wstrLen, regex_str);
-			pattern = new boost::wregex(regex_str, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			pattern = new boost::wregex(regex_str, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
 		}
 
 		if (bGlobal)
@@ -769,7 +769,7 @@ bool CAddInNative::search(tVariant * paParams)
 		else
 		{
 			bClearPattern = true;
-			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
 		}
 
 		if (bGlobal)
@@ -854,7 +854,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 			std::wstring pattern_str;
 			pattern_str.resize(paParams[1].wstrLen);
 			convertUTF16ToUTF32((char16_t *)paParams[1].pwstrVal, paParams[1].wstrLen, pattern_str);
-			pattern = new boost::wregex(pattern_str, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			pattern = new boost::wregex(pattern_str, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
 		}
 		if (bGlobal)
 			res = boost::regex_replace(str, *pattern, replacement);
@@ -900,7 +900,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		else
 		{
 			bClearPattern = true;
-			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
 		}
 		if (bGlobal)
 			res = boost::regex_replace(str, *pattern, paParams[2].pwstrVal);
@@ -963,7 +963,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 			std::wstring pattern_str;
 			pattern_str.resize(paParams[1].wstrLen);
 			convertUTF16ToUTF32((char16_t *)paParams[1].pwstrVal, paParams[1].wstrLen, pattern_str);
-			pattern = new boost::wregex(pattern_str, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			pattern = new boost::wregex(pattern_str, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
 		}
 		pvarRetValue->bVal = boost::regex_match(str, *pattern);
 
@@ -994,7 +994,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 				return true;
 		}
 		else
-			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex::icase : boost::regex_constants::normal);
+			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
 
 		pvarRetValue->bVal = boost::regex_match(paParams[0].pwstrVal, *pattern);
 	}
