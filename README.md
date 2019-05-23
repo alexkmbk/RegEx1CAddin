@@ -2,19 +2,21 @@
 
 # RegEx1CAddin
 
-Внешняя Native API компонента для выполнения регулярных выражений на платформе 1С:Предприятие 8. Написана на C++. Используется движок boost::regex (v 1.69). Версия синтаксиса Perl Compatible Regular Expressions.
+Внешняя Native API компонента для выполнения регулярных выражений на платформе 1С:Предприятие 8. Написана на C++. Используется движок boost::regex (v 1.69, v 1.68 - для Android). Версия синтаксиса Perl Compatible Regular Expressions.
 
 Внимание! Текущая версия является тестовой и еще не была протестирована на реальных проектах и базах. 
 В текущей версии нет совместимости с Windows XP (совместимость была до версии 4).
 
 Текущая версия собрана для следующих платформ:
-Windows 32bit 
-Windows 64bit 
-Linux 32bit 
-Linux 64bit 
-MacOS 64bit 
-
-Тестировалось на платформе 8.3.12.1567 (Windows 7, Windows Server 2008 R2, Ubuntu 14 32-64bit, MacOS Sierra 10.12)
+Windows 32bit    
+Windows 64bit    
+Linux 32bit   
+Linux 64bit   
+MacOS 64bit   
+Android ARMv7-A   
+Android x86   
+Google Chrome (Linux, Windows)   
+Тестировалось на платформе 8.3.12.1567 (Windows 7, Windows Server 2008 R2, Ubuntu 14 32-64bit, MacOS Sierra 10.12, Android 8)
 
 Сборка осуществлялась с использованием следующих инструментов:
 
@@ -23,6 +25,8 @@ MacOS 64bit
 Под Linux: GCC 6
 
 Под Mac OS: Clang 9
+
+Под Android: Android Studio NDK 19.2 
 
 Использовалась статическая сборка, поэтому компонента не требует установки каких-либо дополнительных библиотек.
 
