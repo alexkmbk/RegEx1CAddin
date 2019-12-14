@@ -2,6 +2,8 @@
 
 # RegEx1CAddin
 
+![alt tag](https://github.com/alexkmbk/RegEx1CAddin/blob/master/Title.png)
+
 Внешняя Native API компонента для выполнения регулярных выражений на платформе 1С:Предприятие 8. Написана на C++. Используется движок boost::regex (v 1.69, v 1.68 - для Android). Версия синтаксиса Perl Compatible Regular Expressions.
 
 Внимание!
