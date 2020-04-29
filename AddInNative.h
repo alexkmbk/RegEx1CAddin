@@ -32,6 +32,8 @@ public:
         eMethNext,
 		eMethReplace,
 		eMethCount,
+		eMethSubMatchesCount,
+		eMethGetSubMatch,
 		eMethVersion,
         eMethLast      // Always last
     };
@@ -71,6 +73,7 @@ private:
  	bool search(tVariant* paParams);
 	bool replace(tVariant* pvarRetValue, tVariant* paParams);
 	bool match(tVariant* pvarRetValue, tVariant* paParams);
+	bool getSubMatch(tVariant* pvarRetValue, tVariant* paParams);
 	void version(tVariant* pvarRetValue);
 	void SetLastError(const char* error);
 
@@ -80,6 +83,7 @@ private:
 
 	int m_PropCountOfItemsInSearchResult;
 	std::vector<std::wstring> vResults;
+	std::map<size_t, std::vector<std::wstring>> mSubMatches;
 	int iCurrentPosition;
 	std::string sErrorDescription;
 	bool bThrowExceptions;
@@ -90,6 +94,8 @@ private:
 #endif
 	bool isPattern;
 	bool bGlobal;
+	bool bHierarchicalResultIteration;
+	size_t uiSubMatchesCount;
 };
 
 #endif //__ADDINNATIVE_H__
