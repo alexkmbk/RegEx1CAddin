@@ -317,6 +317,12 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 		pvarPropVal->bVal = bGlobal;
 		return true;
 	}
+	case ePropIgnoreCase:
+	{
+		TV_VT(pvarPropVal) = VTYPE_BOOL;
+		pvarPropVal->bVal = bIgnoreCase;
+		return true;
+	}
 	default:
 		return false;
 	}
@@ -768,7 +774,6 @@ bool CAddInNative::search(tVariant * paParams)
 				size_t i = 0;
 				size_t rootIndex = 0;
 				std::vector<std::wstring> vSubMatches;
-				uiSubMatchesCount = wsmMatch.size() - 1;
 				for (auto r : wsmMatch) {
 					if (i == 0 && bHierarchicalResultIteration) {
 						vResults.push_back(r);
@@ -783,24 +788,27 @@ bool CAddInNative::search(tVariant * paParams)
 				mSubMatches.insert({ rootIndex, vSubMatches });
 				start = wsmMatch[0].second;
 			}
+			uiSubMatchesCount = wsmMatch.size() - 1;
 		}
 		else
 		{
-			boost::regex_search(str, wsmMatch, *pattern);
-			size_t i = 0;
-			std::vector<std::wstring> vSubMatches;
+			bool res = boost::regex_search(str, wsmMatch, *pattern);
 			uiSubMatchesCount = wsmMatch.size() - 1;
-			for (auto r : wsmMatch) {
-				if (i == 0 && bHierarchicalResultIteration) {
-					vResults.push_back(r);
+			if (res) {
+				size_t i = 0;
+				std::vector<std::wstring> vSubMatches;
+				for (auto r : wsmMatch) {
+					if (i == 0 && bHierarchicalResultIteration) {
+						vResults.push_back(r);
+					}
+					else if (bHierarchicalResultIteration)
+						vSubMatches.push_back(r);
+					else if (!bHierarchicalResultIteration)
+						vResults.push_back(r);
+					i++;
 				}
-				else if (bHierarchicalResultIteration)
-					vSubMatches.push_back(r);
-				else if (!bHierarchicalResultIteration)
-					vResults.push_back(r);
-				i++;
+				mSubMatches.insert({ 0, vSubMatches });
 			}
-			mSubMatches.insert({ 0, vSubMatches });
 		}
 
 	}
@@ -850,7 +858,6 @@ bool CAddInNative::search(tVariant * paParams)
 				size_t i = 0;
 				size_t rootIndex = 0;
 				std::vector<std::wstring> vSubMatches;
-				uiSubMatchesCount = wsmMatch.size() - 1;
 				for (auto r : wsmMatch) {
 					if (i == 0 && bHierarchicalResultIteration) {
 						vResults.push_back(r);
@@ -865,24 +872,27 @@ bool CAddInNative::search(tVariant * paParams)
 				mSubMatches.insert({ rootIndex, vSubMatches });
 				start = wsmMatch[0].second;
 			}
+			uiSubMatchesCount = wsmMatch.size() - 1;
 		}
 		else
 		{
-			boost::regex_search(str, wsmMatch, *pattern);
-			size_t i = 0;
-			std::vector<std::wstring> vSubMatches;
+			bool res = boost::regex_search(str, wsmMatch, *pattern);
 			uiSubMatchesCount = wsmMatch.size() - 1;
-			for (auto r : wsmMatch) {
-				if (i == 0 && bHierarchicalResultIteration) {
-					vResults.push_back(r);
+			if (res) {
+				size_t i = 0;
+				std::vector<std::wstring> vSubMatches;
+				for (auto r : wsmMatch) {
+					if (i == 0 && bHierarchicalResultIteration) {
+						vResults.push_back(r);
+					}
+					else if (bHierarchicalResultIteration)
+						vSubMatches.push_back(r);
+					else if (!bHierarchicalResultIteration)
+						vResults.push_back(r);
+					i++;
 				}
-				else if (bHierarchicalResultIteration)
-					vSubMatches.push_back(r);
-				else if (!bHierarchicalResultIteration)
-					vResults.push_back(r);
-				i++;
+				mSubMatches.insert({ 0, vSubMatches });
 			}
-			mSubMatches.insert({ 0, vSubMatches });
 		}
 	}
 	catch (const std::exception& e)
