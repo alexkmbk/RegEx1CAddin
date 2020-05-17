@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <wchar.h>
 #include "AddInNative.h"
-#include <string>
 
 static std::map<std::u16string, long> mMethods;
 static std::vector<std::u16string> vMethods;
@@ -17,12 +16,18 @@ static std::vector<std::u16string> vProps;
 static std::map<std::u16string, long> mProps_ru;
 static std::vector<std::u16string> vProps_ru;
 
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-void convertUTF16ToUTF32(char16_t *input, const size_t input_size, std::basic_string<wchar_t> &output);
-unsigned int convertUTF32ToUTF16(const wchar_t *input, size_t input_size, char16_t *output);
-#endif
-
 static AppCapabilities g_capabilities = eAppCapabilitiesInvalid;
+
+inline void fillMap(std::map<std::u16string, long>& map, const std::vector<std::u16string> & vector) {
+	long index = 0;
+	for (auto &item : vector)
+	{
+		auto lowCasedItem = item;
+		tolowerStr(lowCasedItem);
+		map.insert({ lowCasedItem, index });
+		index++;
+	}
+}
 
 //---------------------------------------------------------------------------//
 long GetClassObject(const WCHAR_T* wsName, IComponentBase** pInterface)
@@ -80,55 +85,23 @@ CAddInNative::CAddInNative()
 #endif
 
 	if (mMethods.size() == 0) {
-		mMethods = {
-		{u"matches", eMethMatches},
-		{u"ismatch", eMethIsMatch},
-		{u"next", eMethNext},
-		{u"replace", eMethReplace},
-		{u"count", eMethCount},
-		{u"submatchescount", eMethSubMatchesCount},
-		{u"getsubmatch", eMethGetSubMatch},
-		{u"version", eMethVersion},
-		};
 		vMethods = { u"Matches", u"IsMatch", u"Next", u"Replace", u"Count", u"SubMatchesCount", u"GetSubMatch", u"Version" };
+		fillMap(mMethods, vMethods);
 	}
 
 	if (mMethods_ru.size() == 0) {
-		mMethods_ru = {
-		{u"найтисовпадения", eMethMatches},
-		{u"совпадает", eMethIsMatch},
-		{u"следующий", eMethNext},
-		{u"заменить", eMethReplace},
-		{u"количество", eMethCount},
-		{u"количествовложенныхгрупп", eMethSubMatchesCount},
-		{u"получитьподгруппу", eMethGetSubMatch},
-		{u"версия", eMethVersion},
-		};
 		vMethods_ru = { u"НайтиСовпадения", u"Совпадает", u"Следующий", u"Заменить", u"Количество", u"КоличествоВложенныхГрупп", u"ПолучитьПодгруппу", u"Версия" };
+		fillMap(mMethods_ru, vMethods_ru);
 	}
 
 	if (mProps.size() == 0) {
-		mProps = {
-		{u"currentvalue", ePropCurrentValue},
-		{u"ignorecase", ePropIgnoreCase},
-		{u"errordescription", ePropErrorDescription},
-		{u"throwexceptions", ePropThrowExceptions},
-		{u"pattern", ePropPattern},
-		{u"global", ePropGlobal},
-		};
-		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global"};
+		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global" };
+		fillMap(mProps, vProps);
 	}
 
 	if (mProps_ru.size() == 0) {
-		mProps_ru = {
-		{u"текущеезначение", ePropCurrentValue},
-		{u"игнорироватьрегистр", ePropIgnoreCase},
-		{u"описаниеошибки", ePropErrorDescription},
-		{u"вызыватьисключения", ePropThrowExceptions},
-		{u"шаблон", ePropPattern},
-		{u"всесовпадения", ePropGlobal},
-		};
 		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения" };
+		fillMap(mProps_ru, vProps_ru);
 	}
 }
 //---------------------------------------------------------------------------//
@@ -177,7 +150,7 @@ long CAddInNative::GetNProps()
 long CAddInNative::FindProp(const WCHAR_T* wsPropName)
 {
 	std::basic_string<char16_t> usPropName = (char16_t*)(wsPropName);
-	std::transform(usPropName.begin(), usPropName.end(), usPropName.begin(), ::towlower);
+	tolowerStr(usPropName);
 
 	auto it = mProps.find(usPropName);
 	if (it != mProps.end())
@@ -458,9 +431,8 @@ long CAddInNative::GetNMethods()
 //---------------------------------------------------------------------------//
 long CAddInNative::FindMethod(const WCHAR_T* wsMethodName)
 {
-
 	std::basic_string<char16_t> usMethodName = (char16_t*)(wsMethodName);
-	std::transform(usMethodName.begin(), usMethodName.end(), usMethodName.begin(), ::towlower);
+	tolowerStr(usMethodName);
 
 	auto it = mMethods.find(usMethodName);
 	if (it != mMethods.end())
@@ -694,20 +666,6 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 	return true;
 }
 
-//---------------------------------------------------------------------------//
-// Платформа передает в компоненту текущее название локали.
-// Название локали зависит от системы и возможно от настроек платформы,
-// может принимать самые различные значения: "ru_RU", "rus", "ru" и т.д.
-// Название локали можно использовать для инициализации локали в стандартной библиотеке шаблонов (STL)
-// языка C++. От установленной локали в STL зависит: 
-// - правила конвертации из строки в число (напр. символ разделения дробной части)
-// - мультибайтовая кодировка (UTF-8, CP1521 и т.д.) в которую будет преобразовываться строка из широких символов функцией wcstombs.
-// - мультибайтовая кодировка, которая будет принята за основу при преобразовании строки из мультибайтовых символов в широкие функцией mbstowcs.
-// - множество прочих национальных особенностей 
-// На текущий момент (v1С = 8.3.6.1760), в функцию могут передаваться названия локалей которые не подходят для передачи
-// в функцию setlocale и она возвращает NULL, с этим надо бы разобраться. Если функция setlocale возвращает NULL,
-// то в неё передается пустая строка, это приводит к установке текущих языковых настроек операционной системы.
-// 
 void CAddInNative::SetLocale(const WCHAR_T* loc)
 {
 #if !defined( __linux__ ) && !defined(__APPLE__) && !defined(__ANDROID__)
@@ -740,11 +698,8 @@ bool CAddInNative::search(tVariant * paParams)
 
 	bHierarchicalResultIteration = paParams[2].bVal;
 
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-	// Сконвертируем в строку с wchar_t символами
 	std::wstring str;
-	str.resize(paParams[0].wstrLen);
-	convertUTF16ToUTF32((char16_t *)paParams[0].pwstrVal, paParams[0].wstrLen, str);
+	GetStrParam(str, paParams, 0);
 	try
 	{
 		if (paParams[1].wstrLen == 0)
@@ -757,10 +712,7 @@ bool CAddInNative::search(tVariant * paParams)
 		else
 		{
 			bClearPattern = true;
-			std::wstring regex_str;
-			regex_str.resize(paParams[1].wstrLen);
-			convertUTF16ToUTF32((char16_t *)paParams[1].pwstrVal, paParams[1].wstrLen, regex_str);
-			pattern = new boost::wregex(regex_str, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
+			pattern = GetPattern(paParams, 1);
 		}
 
 		if (bGlobal)
@@ -774,7 +726,7 @@ bool CAddInNative::search(tVariant * paParams)
 				size_t i = 0;
 				size_t rootIndex = 0;
 				std::vector<std::wstring> vSubMatches;
-				for (auto r : wsmMatch) {
+				for (auto &r : wsmMatch) {
 					if (i == 0 && bHierarchicalResultIteration) {
 						vResults.push_back(r);
 						rootIndex = vResults.size() - 1;
@@ -797,91 +749,7 @@ bool CAddInNative::search(tVariant * paParams)
 			if (res) {
 				size_t i = 0;
 				std::vector<std::wstring> vSubMatches;
-				for (auto r : wsmMatch) {
-					if (i == 0 && bHierarchicalResultIteration) {
-						vResults.push_back(r);
-					}
-					else if (bHierarchicalResultIteration)
-						vSubMatches.push_back(r);
-					else if (!bHierarchicalResultIteration)
-						vResults.push_back(r);
-					i++;
-				}
-				mSubMatches.insert({ 0, vSubMatches });
-			}
-		}
-
-	}
-	catch (const std::exception& e)
-	{
-		SetLastError(e.what());
-		vResults.clear();
-		mSubMatches.clear();
-		iCurrentPosition = -1;
-		uiSubMatchesCount = 0;
-		m_PropCountOfItemsInSearchResult = 0;
-		if (bClearPattern && pattern != NULL)
-			delete pattern;
-
-		if (bThrowExceptions)
-			return false;
-		else
-			return true;
-	}
-
-#else
-	std::wstring str;
-	str.assign(paParams[0].pwstrVal, paParams[0].wstrLen);
-	try
-	{
-		if (paParams[1].wstrLen == 0)
-		{
-			if (isPattern)
-				pattern = &rePattern;
-			else
-				return true;
-		}
-		else
-		{
-			bClearPattern = true;
-			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
-		}
-
-		if (bGlobal)
-		{
-			std::wstring::const_iterator start = str.begin();
-			std::wstring::const_iterator end = str.end();
-
-			while (start < end &&
-				boost::regex_search(start, end, wsmMatch, *pattern))
-			{
-				size_t i = 0;
-				size_t rootIndex = 0;
-				std::vector<std::wstring> vSubMatches;
-				for (auto r : wsmMatch) {
-					if (i == 0 && bHierarchicalResultIteration) {
-						vResults.push_back(r);
-						rootIndex = vResults.size() - 1;
-					}
-					else if (bHierarchicalResultIteration)
-						vSubMatches.push_back(r);
-					else if (!bHierarchicalResultIteration)
-						vResults.push_back(r);
-					i++;
-				}
-				mSubMatches.insert({ rootIndex, vSubMatches });
-				start = wsmMatch[0].second;
-			}
-			uiSubMatchesCount = wsmMatch.size() - 1;
-		}
-		else
-		{
-			bool res = boost::regex_search(str, wsmMatch, *pattern);
-			uiSubMatchesCount = wsmMatch.size() - 1;
-			if (res) {
-				size_t i = 0;
-				std::vector<std::wstring> vSubMatches;
-				for (auto r : wsmMatch) {
+				for (auto &r : wsmMatch) {
 					if (i == 0 && bHierarchicalResultIteration) {
 						vResults.push_back(r);
 					}
@@ -910,13 +778,13 @@ bool CAddInNative::search(tVariant * paParams)
 		else
 			return true;
 	}
-#endif
 	iCurrentPosition = -1;
 	m_PropCountOfItemsInSearchResult = vResults.size();
 	if (bClearPattern && pattern != NULL)
 		delete pattern;
 	return true;
 }
+
 bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 {
 	SetLastError("");
@@ -929,15 +797,9 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	boost::wregex* pattern = NULL;
 	bool bClearPattern = false;
 
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-	// Сконвертируем в строку с wchar_t символами
 	std::wstring str;
-	str.resize(paParams[0].wstrLen);
-	convertUTF16ToUTF32((char16_t *)paParams[0].pwstrVal, paParams[0].wstrLen, str);
+	GetStrParam(str, paParams, 0);
 
-	std::wstring replacement;
-	replacement.resize(paParams[2].wstrLen);
-	convertUTF16ToUTF32((char16_t *)paParams[2].pwstrVal, paParams[2].wstrLen, replacement);
 	std::wstring res;
 	try
 	{
@@ -951,16 +813,23 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		else
 		{
 			bClearPattern = true;
-			std::wstring pattern_str;
-			pattern_str.resize(paParams[1].wstrLen);
-			convertUTF16ToUTF32((char16_t *)paParams[1].pwstrVal, paParams[1].wstrLen, pattern_str);
-			pattern = new boost::wregex(pattern_str, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
+			pattern = GetPattern(paParams, 1);
 		}
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+
+		std::wstring replacement;
+		GetStrParam(replacement, paParams, 2);
 		if (bGlobal)
 			res = boost::regex_replace(str, *pattern, replacement);
 		else
 			res = boost::regex_replace(str, *pattern, replacement, boost::regex_constants::format_first_only);
+#else
+		if (bGlobal)
+			res = boost::regex_replace(str, *pattern, paParams[2].pwstrVal);
+		else
+			res = boost::regex_replace(str, *pattern, paParams[2].pwstrVal, boost::regex_constants::format_first_only);
 
+#endif
 	}
 	catch (const std::exception& e)
 	{
@@ -977,6 +846,8 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		else
 			return true;
 	}
+
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char32_t)))
 	{
@@ -985,47 +856,6 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		return true;
 	}
 #else
-
-	std::wstring str;
-	str.assign(paParams[0].pwstrVal, paParams[0].wstrLen);
-	std::wstring res;
-	try
-	{
-		boost::wregex* pattern;
-		if (paParams[1].wstrLen == 0)
-		{
-			if (isPattern)
-				pattern = &rePattern;
-			else
-				return true;
-		}
-		else
-		{
-			bClearPattern = true;
-			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
-		}
-		if (bGlobal)
-			res = boost::regex_replace(str, *pattern, paParams[2].pwstrVal);
-		else
-			res = boost::regex_replace(str, *pattern, paParams[2].pwstrVal, boost::regex_constants::format_first_only);
-	}
-	catch (const std::exception& e)
-	{
-		vResults.clear();
-		mSubMatches.clear();
-		iCurrentPosition = -1;
-		uiSubMatchesCount = 0;
-		m_PropCountOfItemsInSearchResult = 0;
-		if (bClearPattern && pattern != NULL)
-			delete pattern;
-
-		SetLastError(e.what());
-		if (bThrowExceptions)
-			return false;
-		else
-			return true;
-	}
-
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(wchar_t)))
 	{
 		memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(wchar_t));
@@ -1047,11 +877,8 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 
 	boost::wregex* pattern = NULL;
 	bool bClearPattern = false;
-
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 	std::wstring str;
-	str.resize(paParams[0].wstrLen);
-	convertUTF16ToUTF32((char16_t *)paParams[0].pwstrVal, paParams[0].wstrLen, str);
+	GetStrParam(str, paParams, 0);
 	try
 	{
 		if (paParams[1].wstrLen == 0)
@@ -1064,10 +891,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		else
 		{
 			bClearPattern = true;
-			std::wstring pattern_str;
-			pattern_str.resize(paParams[1].wstrLen);
-			convertUTF16ToUTF32((char16_t *)paParams[1].pwstrVal, paParams[1].wstrLen, pattern_str);
-			pattern = new boost::wregex(pattern_str, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
+			pattern = GetPattern(paParams, 1);
 		}
 		pvarRetValue->bVal = boost::regex_match(str, *pattern);
 
@@ -1087,39 +911,6 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		else
 			return true;
 	}
-
-#else
-	try
-	{
-		boost::wregex* pattern;
-		if (paParams[1].wstrLen == 0)
-		{
-			if (isPattern)
-				pattern = &rePattern;
-			else
-				return true;
-		}
-		else
-			pattern = new boost::wregex(paParams[1].pwstrVal, paParams[1].wstrLen, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
-
-		pvarRetValue->bVal = boost::regex_match(paParams[0].pwstrVal, *pattern);
-	}
-	catch (const std::exception& e)
-	{
-		vResults.clear();
-		mSubMatches.clear();
-		iCurrentPosition = -1;
-		uiSubMatchesCount = 0;
-		m_PropCountOfItemsInSearchResult = 0;
-		if (bClearPattern && pattern != NULL)
-			delete pattern;
-		SetLastError(e.what());
-		if (bThrowExceptions)
-			return false;
-		else
-			return true;
-	}
-#endif
 	iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
 	vResults.clear();
@@ -1171,10 +962,6 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 
 	std::wstring &wsSubMatch = subMatch.at(subMatchIndex);
 
-	/*if (subMatchIndex >= 0 && subMatchIndex < subMatch.size()) {
-		wsSubMatch = subMatch.at(subMatchIndex);
-	}*/
-
 	#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 		if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (wsSubMatch.length() + 1) * sizeof(char32_t)))
 		{
@@ -1221,62 +1008,24 @@ void CAddInNative::SetLastError(const char* error) {
 
 }
 
+void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex) {
 #if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-
-inline int is_high_surrogate(char16_t uc) { return (uc & 0xfffffc00) == 0xd800; }
-inline int is_low_surrogate(char16_t uc) { return (uc & 0xfffffc00) == 0xdc00; }
-
-inline char32_t surrogate_to_utf32(char16_t high, char16_t low) {
-	return (high << 10) + low - 0x35fdc00;
-}
-
-// The algorithm is based on this answer:
-//https://stackoverflow.com/a/23920015/2134488
-//
-void convertUTF16ToUTF32(char16_t *input,
-	const size_t input_size,
-	std::basic_string<wchar_t> &output)
-{
-	int i = 0;
-	const char16_t * const end = input + input_size;
-	while (input < end) {
-		const char16_t uc = *input++;
-		if (!((uc - 0xd800u) < 2048u)) {
-			output[i++] = uc;
-		}
-		else {
-			if (is_high_surrogate(uc) && input < end && is_low_surrogate(*input)) {
-				output[i++] = (wchar_t)surrogate_to_utf32(uc, *input++);
-			}
-			else {
-				output[i++] = 0; //ERROR
-			}
-		}
-	}
-}
-
-// The algorithm is based on this answer:
-//https://stackoverflow.com/questions/955484/is-it-possible-to-convert-utf32-text-to-utf16-using-only-windows-api
-//
-unsigned int convertUTF32ToUTF16(const wchar_t *input, size_t input_size, char16_t *output)
-{
-	char16_t *start = output;
-	const wchar_t * const end = input + input_size;
-	while (input < end) {
-		const wchar_t cUTF32 = *input++;
-		if (cUTF32 < 0x10000)
-		{
-			*output++ = cUTF32;
-		}
-		else {
-			unsigned int t = cUTF32 - 0x10000;
-			wchar_t h = (((t << 12) >> 22) + 0xD800);
-			wchar_t l = (((t << 22) >> 22) + 0xDC00);
-			*output++ = h;
-			*output++ = (l & 0x0000FFFF);
-		}
-	}
-	return (output - start) * 2; // size in bytes
-}
-
+	str.resize(paParams[paramIndex].wstrLen);
+	convertUTF16ToUTF32((char16_t *)paParams[paramIndex].pwstrVal, paParams[paramIndex].wstrLen, str);
+#else
+	str.assign(paParams[paramIndex].pwstrVal, paParams[paramIndex].wstrLen);
 #endif
+}
+
+boost::wregex*  CAddInNative::GetPattern(tVariant* paParams, const long paramIndex) {
+
+#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+	std::wstring regex_str;
+	regex_str.resize(paParams[paramIndex].wstrLen);
+	convertUTF16ToUTF32((char16_t *)paParams[paramIndex].pwstrVal, paParams[paramIndex].wstrLen, regex_str);
+	return new boost::wregex(regex_str, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
+#else
+	return new boost::wregex(paParams[paramIndex].pwstrVal, paParams[paramIndex].wstrLen, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
+#endif
+
+}

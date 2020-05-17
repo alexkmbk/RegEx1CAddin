@@ -7,6 +7,8 @@
 #include "AddInDefBase.h"
 #include "IMemoryManager.h"
 
+#include "StrConv.h"
+
 #define MBCMAXSIZE  6 // максимальная длина символа мультибайтовой строки (для функции wcstombs)
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -76,6 +78,9 @@ private:
 	bool getSubMatch(tVariant* pvarRetValue, tVariant* paParams);
 	void version(tVariant* pvarRetValue);
 	void SetLastError(const char* error);
+
+	void GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex);
+	boost::wregex* GetPattern(tVariant* paParams, const long paramIndex);
 
     // Attributes
     IAddInDefBase      *m_iConnect;
