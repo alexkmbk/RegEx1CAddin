@@ -208,10 +208,11 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 	{
 		TV_VT(pvarPropVal) = VTYPE_PWSTR;
 		std::wstring* wsCurrentValue;
-		if (vResults.size() == 0 || iCurrentPosition == -1)
+		if (vResults.size() == 0 || iCurrentPosition == -1 || vResults.size() <= iCurrentPosition)
 		{
-			std::wstring emptyStr = L"";
-			wsCurrentValue = &emptyStr;
+			pvarPropVal->pwstrVal = NULL;
+			pvarPropVal->wstrLen = 0;
+			return true;
 		}
 		else
 			wsCurrentValue = &vResults[iCurrentPosition];
@@ -630,13 +631,19 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		return replace(pvarRetValue, paParams);
 	case eMethNext:
 	{
-		iCurrentPosition++;
 		if (iCurrentPosition >= m_PropCountOfItemsInSearchResult) {
 			TV_VT(pvarRetValue) = VTYPE_BOOL;
 			pvarRetValue->bVal = false;
 			return true;
 		}
+		else if ((iCurrentPosition + 1) == m_PropCountOfItemsInSearchResult){
+			iCurrentPosition++;
+			TV_VT(pvarRetValue) = VTYPE_BOOL;
+			pvarRetValue->bVal = false;
+			return true;
+		}
 		else {
+			iCurrentPosition++;
 			TV_VT(pvarRetValue) = VTYPE_BOOL;
 			pvarRetValue->bVal = true;
 			return true;
@@ -982,7 +989,7 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"11";
+	std::basic_string<char16_t> res = u"12";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
