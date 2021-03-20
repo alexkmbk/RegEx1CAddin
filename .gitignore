@@ -33,6 +33,8 @@ CMakeTemp/
 macos/
 tests/
 lib/webbrowsers/
+Android/Package/
+
 MacBuild/
 Package/
 # Visual Studio 2015 cache/options directory
