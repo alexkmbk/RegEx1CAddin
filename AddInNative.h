@@ -1,11 +1,20 @@
 ﻿#ifndef __ADDINNATIVE_H__
 #define __ADDINNATIVE_H__
 
-#include "boost/regex.hpp"
+//#include "boost/regex.hpp"
+
+#define PCRE2_STATIC
+#define PCRE2_CODE_UNIT_WIDTH 16
+//#define PCRE2_LOCAL_WIDTH 16
+
+#include "pcer2/pcre2.h"
 
 #include "ComponentBase.h"
 #include "AddInDefBase.h"
 #include "IMemoryManager.h"
+
+#include <vector>
+#include <map>
 
 #include "StrConv.h"
 
@@ -77,23 +86,25 @@ private:
 	bool match(tVariant* pvarRetValue, tVariant* paParams);
 	bool getSubMatch(tVariant* pvarRetValue, tVariant* paParams);
 	void version(tVariant* pvarRetValue);
-	void SetLastError(const char* error);
+	void SetLastError(const char16_t* error);
 
 	void GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex);
-	boost::wregex* GetPattern(tVariant* paParams, const long paramIndex);
+	pcre2_code* GetPattern(tVariant* paParams, const long paramIndex);
 
     // Attributes
     IAddInDefBase      *m_iConnect;
     IMemoryManager     *m_iMemory;
 
 	int m_PropCountOfItemsInSearchResult;
-	std::vector<std::wstring> vResults;
-	std::map<size_t, std::vector<std::wstring>> mSubMatches;
+	std::vector<std::basic_string<char16_t>> vResults;
+	std::map<size_t, std::vector<std::basic_string<char16_t>>> mSubMatches;
 	int iCurrentPosition;
-	std::string sErrorDescription;
+	std::basic_string<char16_t> sErrorDescription;
 	bool bThrowExceptions;
 	bool bIgnoreCase;
-	boost::wregex rePattern;
+	pcre2_code* rePattern;
+	std::basic_string<char16_t> sPattern;
+
 #if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 	std::u16string uPattern;
 #endif

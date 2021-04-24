@@ -10,12 +10,12 @@ ifeq ($(macos),1)
 TARGETDIR = "$(CURDIR)/macos/"
 TARGET = $(TARGETDIR)RegExMac64.so
 LIBPATHS = -Llib/macos/
-LIBS= boost_regex
+LIBS= pcre2-16
 else
 TARGETDIR = $(CURDIR)/linux/x$(CPU)/
 TARGET = $(TARGETDIR)RegEx$(CPU).so
 LIBPATHS = -Llib/linux/x$(CPU)/
-LIBS= boost_regex
+LIBS= pcre2-16
 endif
 
 OBJECTS=$(SOURCES:.cpp=.o)

@@ -6,6 +6,8 @@
 #include <wchar.h>
 #include "AddInNative.h"
 
+
+
 static std::map<std::u16string, long> mMethods;
 static std::vector<std::u16string> vMethods;
 static std::map<std::u16string, long> mMethods_ru;
@@ -73,16 +75,14 @@ CAddInNative::CAddInNative()
 	iCurrentPosition = -1;
 	uiSubMatchesCount = 0;
 	m_PropCountOfItemsInSearchResult = 0;
-	sErrorDescription = "";
+	sErrorDescription = u"";
 	bThrowExceptions = false;
 	bIgnoreCase = false;
 	isPattern = false;
 	bGlobal = false;
 	bHierarchicalResultIteration = false;
 
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-	uPattern.clear();
-#endif
+	sPattern.clear();
 
 	if (mMethods.size() == 0) {
 		vMethods = { u"Matches", u"IsMatch", u"Next", u"Replace", u"Count", u"SubMatchesCount", u"GetSubMatch", u"Version" };
@@ -207,23 +207,14 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 	case ePropCurrentValue:
 	{
 		TV_VT(pvarPropVal) = VTYPE_PWSTR;
-		std::wstring* wsCurrentValue;
-		if (vResults.size() == 0 || iCurrentPosition == -1)
+		std::basic_string<char16_t>* wsCurrentValue;
+		if (vResults.size() == 0 || iCurrentPosition == -1 || iCurrentPosition >= vResults.size())
 		{
-			std::wstring emptyStr = L"";
+			std::basic_string<char16_t> emptyStr = u"";
 			wsCurrentValue = &emptyStr;
 		}
 		else
 			wsCurrentValue = &vResults[iCurrentPosition];
-
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue->length() + 1) * sizeof(char32_t)))
-		{
-			convertUTF32ToUTF16(wsCurrentValue->c_str(), wsCurrentValue->length(), (char16_t *)pvarPropVal->pwstrVal);
-			pvarPropVal->wstrLen = wsCurrentValue->length();
-			return true;
-	}
-#else
 
 		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue->length() + 1) * sizeof(wchar_t)))
 		{
@@ -231,16 +222,15 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 			pvarPropVal->wstrLen = wsCurrentValue->length();
 			return true;
 		}
-#endif
 		return false;
 	};
 	case ePropErrorDescription:
 	{
-		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pstrVal, (sErrorDescription.length() + 1) * sizeof(char)))
+		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (sErrorDescription.length() + 1) * sizeof(char16_t)))
 		{
-			strcpy(pvarPropVal->pstrVal, sErrorDescription.c_str());
+			memcpy(pvarPropVal->pwstrVal, sErrorDescription.c_str(), (sErrorDescription.length() + 1) * sizeof(char16_t));
 			TV_VT(pvarPropVal) = VTYPE_PSTR;
-			pvarPropVal->strLen = sErrorDescription.length();
+			pvarPropVal->wstrLen = sErrorDescription.length();
 			return true;
 		}
 		else
@@ -259,23 +249,13 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 	}
 	case ePropPattern:
 	{
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (uPattern.length() + 1) * sizeof(WCHAR)))
+		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (sPattern.length() + 1) * sizeof(WCHAR)))
 		{
-			memcpy(pvarPropVal->pwstrVal, uPattern.c_str(), uPattern.length() * sizeof(WCHAR));
+			memcpy(pvarPropVal->pwstrVal, sPattern.c_str(), sPattern.length() * sizeof(WCHAR));
 			TV_VT(pvarPropVal) = VTYPE_PWSTR;
-			pvarPropVal->wstrLen = uPattern.length();
-			return true;
-}
-#else
-		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (rePattern.str().length() + 1) * sizeof(WCHAR)))
-		{
-			memcpy(pvarPropVal->pwstrVal, rePattern.str().c_str(), rePattern.str().length() * sizeof(WCHAR));
-			TV_VT(pvarPropVal) = VTYPE_PWSTR;
-			pvarPropVal->wstrLen = rePattern.str().length();
+			pvarPropVal->wstrLen = sPattern.length();
 			return true;
 		}
-#endif
 		else
 		{
 			TV_VT(pvarPropVal) = VTYPE_PWSTR;
@@ -305,7 +285,7 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 //---------------------------------------------------------------------------//
 bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 {
-	SetLastError("");
+	SetLastError(u"");
 
 	switch (lPropNum)
 	{
@@ -320,35 +300,36 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 		bIgnoreCase = TV_BOOL(varPropVal);
 		return true;
 	}
-	case ePropPattern: {
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+	case ePropPattern: 
+	{
+		int errornumber;
+		PCRE2_SIZE erroroffset = NULL;
 
-		uPattern.assign((char16_t *)varPropVal->pwstrVal, varPropVal->wstrLen);
+			sPattern.assign((char16_t*)varPropVal->pwstrVal, varPropVal->wstrLen);
+			rePattern = pcre2_compile((PCRE2_SPTR16) (varPropVal->pwstrVal),               /* the pattern */
+			varPropVal->wstrLen, /* indicates pattern is zero-terminated */
+			PCRE2_UTF|(bIgnoreCase ? PCRE2_CASELESS: 0), /* options */
+			&errornumber,          /* for error number */
+			&erroroffset,          /* for error offset */
+			NULL);
 
-		// Сконвертируем в строку с wchar_t символами
-		std::wstring wcsPattern;
-		wcsPattern.resize(varPropVal->wstrLen);
-		convertUTF16ToUTF32((char16_t *)varPropVal->pwstrVal, varPropVal->wstrLen, wcsPattern);
-		try {
-			rePattern.assign(wcsPattern, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
-		}
-		catch (const std::exception& e)
+		if (rePattern == NULL)
 		{
+			PCRE2_UCHAR buffer[256];
+			pcre2_get_error_message_16(errornumber, buffer, sizeof(buffer));
 			vResults.clear();
 			mSubMatches.clear();
-			uPattern.clear();
 			isPattern = false;
 			iCurrentPosition = -1;
 			uiSubMatchesCount = 0;
 			m_PropCountOfItemsInSearchResult = 0;
-			SetLastError(e.what());
+			//SetLastError(buffer);
 			if (bThrowExceptions)
 				return false;
 			else
 				return true;
 		}
-#else
-		try
+		/*try
 		{
 			rePattern.assign(varPropVal->pwstrVal, varPropVal->wstrLen, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
 		}
@@ -365,8 +346,8 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 				return false;
 			else
 				return true;
-		}
-#endif
+		}*/
+//#endif
 		isPattern = true;
 		return true;
 	}
@@ -654,7 +635,7 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		return true;
 	}
 	case eMethGetSubMatch: {		
-		return getSubMatch(pvarRetValue, paParams);;
+		return getSubMatch(pvarRetValue, paParams);
 	}
 	case eMethVersion: {
 		version(pvarRetValue);
@@ -686,19 +667,109 @@ bool CAddInNative::setMemManager(void* mem)
 
 bool CAddInNative::search(tVariant * paParams)
 {
-	SetLastError("");
+	SetLastError(u"");
 	vResults.clear();
 	mSubMatches.clear();
 	iCurrentPosition = -1;
 	uiSubMatchesCount = 0;
 
-	boost::wsmatch wsmMatch;
-	boost::wregex* pattern = NULL;
+	//boost::wsmatch wsmMatch;
+	pcre2_code* pattern = NULL;
 	bool bClearPattern = false;
 
 	bHierarchicalResultIteration = paParams[2].bVal;
 
-	std::wstring str;
+	if (paParams[1].wstrLen == 0)
+	{
+		if (isPattern)
+			pattern = rePattern;
+		else
+			if (bThrowExceptions) {
+				SetLastError(u"The regexp template is not specified.");
+				return false;
+			}
+			else
+				return true;
+	}
+	else
+	{
+		bClearPattern = true;
+		pattern = GetPattern(paParams, 1);
+	}
+
+	if (pattern == NULL)
+	{
+		if (bThrowExceptions)
+			return false;
+		else
+			return true;
+	}
+
+	PCRE2_SIZE start_offset = 0;
+	size_t rootIndex = 0;
+	int rc;
+
+	pcre2_match_data* match_data = pcre2_match_data_create_from_pattern(pattern, NULL);
+
+	while (true) {
+		rc = pcre2_match(
+			pattern,                   /* the compiled pattern */
+			(PCRE2_SPTR16)paParams[0].pwstrVal,              /* the subject string */
+			paParams[0].wstrLen,       /* the length of the subject */
+			start_offset,                    /* start at offset 0 in the subject */
+			0,                    /* default options */
+			match_data,           /* block for storing the result */
+			NULL);
+
+		if (rc < 0)
+		{
+				if (rc == PCRE2_ERROR_NOMATCH)
+					break;
+				/*case PCRE2_ERROR_NOMATCH: printf("No match\n"); break;
+					/*
+					Handle other special cases if you like
+					*/
+					//default: printf("Matching error %d\n", rc); break;
+			pcre2_match_data_free(match_data);   /* Release memory used for the match */
+			//pcre2_code_free(pattern);                 /*   data and the compiled pattern. */
+			if (bThrowExceptions)
+				return false;
+			else
+				return true;
+		}
+		else if (rc == 0) {
+			break;
+		}
+		PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+
+
+		std::vector<std::basic_string<char16_t>> vSubMatches;
+
+		for (int i = 0; i < rc; i++)
+		{
+			std::basic_string<char16_t> r;
+
+			r.assign((char16_t*)(paParams[0].pwstrVal + ovector[2 * i]), ovector[2 * i + 1] - ovector[2 * i]);
+
+			if (i == 0 && bHierarchicalResultIteration) {
+				vResults.push_back(r);
+				rootIndex = vResults.size() - 1;
+			}
+			else if (bHierarchicalResultIteration)
+				vSubMatches.push_back(r);
+			else if (!bHierarchicalResultIteration)
+				vResults.push_back(r);
+		}
+		if (bHierarchicalResultIteration)
+			mSubMatches.insert({ rootIndex, vSubMatches});
+		if (bGlobal)
+			start_offset = ovector[1];
+		else
+			break;
+	}
+	uiSubMatchesCount = rc - 1;
+
+	/*std::wstring str;
 	GetStrParam(str, paParams, 0);
 	try
 	{
@@ -777,7 +848,8 @@ bool CAddInNative::search(tVariant * paParams)
 			return false;
 		else
 			return true;
-	}
+	}*/
+	pcre2_match_data_free(match_data);
 	iCurrentPosition = -1;
 	m_PropCountOfItemsInSearchResult = vResults.size();
 	if (bClearPattern && pattern != NULL)
@@ -787,7 +859,76 @@ bool CAddInNative::search(tVariant * paParams)
 
 bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 {
-	SetLastError("");
+	SetLastError(u"");
+	TV_VT(pvarRetValue) = VTYPE_PWSTR;
+	
+	pcre2_code* pattern = NULL;
+	bool bClearPattern = false;
+
+	if (paParams[1].wstrLen == 0)
+	{
+		if (isPattern)
+			pattern = rePattern;
+		else
+			return true;
+	}
+	else
+	{
+		bClearPattern = true;
+		pattern = GetPattern(paParams, 1);
+	}
+
+	PCRE2_SIZE start_offset = 0;
+	size_t rootIndex = 0;
+	int rc;
+
+	pcre2_match_data* match_data = pcre2_match_data_create_from_pattern(pattern, NULL);
+
+	PCRE2_UCHAR outputbuffer;
+	PCRE2_SIZE outlength = 0;
+
+	rc = pcre2_substitute(pattern, 
+		(PCRE2_SPTR16)paParams[0].pwstrVal, 
+		paParams[0].wstrLen,
+		0,
+		bGlobal?PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_EXTENDED : PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_EXTENDED,
+		match_data,
+		NULL,
+		(PCRE2_SPTR16)paParams[2].pwstrVal, 
+		paParams[2].wstrLen, 0, &outlength);
+
+	if (rc == PCRE2_ERROR_NOMEMORY)
+	{
+		if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (outlength + 1) * sizeof(WCHAR)))
+		{
+			rc = pcre2_substitute(pattern,
+				(PCRE2_SPTR16)paParams[0].pwstrVal,
+				paParams[0].wstrLen,
+				0,
+				bGlobal ? PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_EXTENDED : PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_EXTENDED,
+				match_data,
+				NULL,
+				(PCRE2_SPTR16)paParams[2].pwstrVal,
+				paParams[2].wstrLen, (PCRE2_UCHAR *)pvarRetValue->pwstrVal, &outlength); 
+			if (rc > 0) 
+				pvarRetValue->wstrLen = outlength;
+			else
+				pvarRetValue->wstrLen = 0;
+		}
+	}
+	else
+		pvarRetValue->wstrLen = 0;
+
+	pcre2_match_data_free(match_data);
+
+	iCurrentPosition = 0;
+	m_PropCountOfItemsInSearchResult = 0;
+	vResults.clear();
+	mSubMatches.clear();
+	if (bClearPattern && pattern != NULL)
+		delete pattern;
+
+	/*SetLastError("");
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 	iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
@@ -865,14 +1006,63 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 #endif
 
 	if (bClearPattern && pattern != NULL)
-		delete pattern;
+		delete pattern;*/
 
-	return false;
+	return true;
 }
 
 bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 {
-	SetLastError("");
+	SetLastError(u"");
+	TV_VT(pvarRetValue) = VTYPE_BOOL;
+
+	pcre2_code* pattern = NULL;
+	bool bClearPattern = false;
+
+	if (paParams[1].wstrLen == 0)
+	{
+		if (isPattern)
+			pattern = rePattern;
+		else
+			return true;
+	}
+	else
+	{
+		bClearPattern = true;
+		pattern = GetPattern(paParams, 1);
+	}
+
+	PCRE2_SIZE start_offset = 0;
+	size_t rootIndex = 0;
+	int rc;
+
+	pcre2_match_data* match_data = pcre2_match_data_create_from_pattern(pattern, NULL);
+
+		rc = pcre2_match(
+			pattern,                   /* the compiled pattern */
+			(PCRE2_SPTR16)paParams[0].pwstrVal,              /* the subject string */
+			paParams[0].wstrLen,       /* the length of the subject */
+			start_offset,                    /* start at offset 0 in the subject */
+			0,                    /* default options */
+			match_data,           /* block for storing the result */
+			NULL);
+
+		if (rc > 0)
+			pvarRetValue->bVal = true;
+		else
+			pvarRetValue->bVal = false;
+
+		pcre2_match_data_free(match_data);
+
+		iCurrentPosition = 0;
+		m_PropCountOfItemsInSearchResult = 0;
+		vResults.clear();
+		mSubMatches.clear();
+		if (bClearPattern && pattern != NULL)
+			delete pattern; 
+
+
+	/*SetLastError("");
 	TV_VT(pvarRetValue) = VTYPE_BOOL;
 
 	boost::wregex* pattern = NULL;
@@ -916,18 +1106,19 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 	vResults.clear();
 	mSubMatches.clear();
 	if (bClearPattern && pattern != NULL)
-		delete pattern;
+		delete pattern;*/
 	return true;
 }
 
 bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 {
-	SetLastError("");
+	SetLastError(u"");
+
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 	int subMatchIndex = paParams[0].lVal;
 
 	if (iCurrentPosition < 0) {
-		SetLastError("Results were not selected");
+		SetLastError(u"Results were not selected");
 		if (bThrowExceptions)
 			return false;
 		else
@@ -935,7 +1126,7 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 	}
 
 	if (!bHierarchicalResultIteration) {
-		SetLastError("Hierarchical selection mode is not enabled");
+		SetLastError(u"Hierarchical selection mode is not enabled");
 		if (bThrowExceptions)
 			return false;
 		else
@@ -943,7 +1134,7 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 	}
 
 	if (iCurrentPosition >= mSubMatches.size()) {
-		SetLastError("There are no any submatches in the selection");
+		SetLastError(u"There are no any submatches in the selection");
 		if (bThrowExceptions)
 			return false;
 		else
@@ -953,16 +1144,17 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 	auto &subMatch = mSubMatches.at(iCurrentPosition);
 
 	if (subMatchIndex < 0 || subMatchIndex >= subMatch.size()) {
-		SetLastError("Submatch index is out of range.");
+		SetLastError(u"Submatch index is out of range.");
 		if (bThrowExceptions)
 			return false;
 		else
 			return true;
 	}
 
-	std::wstring &wsSubMatch = subMatch.at(subMatchIndex);
 
-	#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+	std::basic_string<char16_t> &wsSubMatch = subMatch.at(subMatchIndex);
+
+	/*#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 		if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (wsSubMatch.length() + 1) * sizeof(char32_t)))
 		{
 			convertUTF32ToUTF16(wsSubMatch.c_str(), wsSubMatch.length(), (char16_t *)pvarRetValue->pwstrVal);
@@ -974,15 +1166,19 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 			memcpy(pvarRetValue->pwstrVal, wsSubMatch.c_str(), (wsSubMatch.length() + 1) * sizeof(char16_t));
 			pvarRetValue->wstrLen = wsSubMatch.length();
 		}
-	#endif
-
-		return true;
+	#endif*/
+	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (wsSubMatch.length() + 1) * sizeof(char16_t)))
+	{
+		memcpy(pvarRetValue->pwstrVal, wsSubMatch.c_str(), (wsSubMatch.length() + 1) * sizeof(char16_t));
+		pvarRetValue->wstrLen = wsSubMatch.length();
+	}
+	return true;
 }
 
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"11";
+	std::basic_string<char16_t> res = u"13";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
@@ -1000,12 +1196,11 @@ void CAddInNative::version(tVariant * pvarRetValue)
 // на самом первом этапе, в текст ошибки добавляется её первопричина, а на более 
 // высоких уровнях её можно дополнить описанием о выполняемых действиях
 //
-void CAddInNative::SetLastError(const char* error) {
+void CAddInNative::SetLastError(const char16_t* error) {
 
 	if (error == 0) sErrorDescription.clear();
-	if (sErrorDescription.length() != 0) sErrorDescription = std::string(error) + ": " + sErrorDescription;
+	if (sErrorDescription.length() != 0) sErrorDescription = std::basic_string<char16_t>(error) + u": " + sErrorDescription;
 	else sErrorDescription = error;
-
 }
 
 void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex) {
@@ -1017,15 +1212,32 @@ void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const lon
 #endif
 }
 
-boost::wregex*  CAddInNative::GetPattern(tVariant* paParams, const long paramIndex) {
+pcre2_code*  CAddInNative::GetPattern(tVariant* paParams, const long paramIndex) {
 
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-	std::wstring regex_str;
-	regex_str.resize(paParams[paramIndex].wstrLen);
-	convertUTF16ToUTF32((char16_t *)paParams[paramIndex].pwstrVal, paParams[paramIndex].wstrLen, regex_str);
-	return new boost::wregex(regex_str, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
-#else
-	return new boost::wregex(paParams[paramIndex].pwstrVal, paParams[paramIndex].wstrLen, (bIgnoreCase) ? boost::regex_constants::icase : boost::regex_constants::normal);
-#endif
+	int errornumber;
+	PCRE2_SIZE erroroffset = NULL;
+	pcre2_code* res;
+
+	res = pcre2_compile((PCRE2_SPTR16)(paParams[paramIndex]).pwstrVal,               /* the pattern */
+		paParams[paramIndex].wstrLen, /* indicates pattern is zero-terminated */
+		PCRE2_UTF|(bIgnoreCase ? PCRE2_CASELESS : 0), /* options */
+		&errornumber,          /* for error number */
+		&erroroffset,          /* for error offset */
+		NULL);
+
+	if (res == NULL)
+	{
+		PCRE2_UCHAR buffer[256];
+		pcre2_get_error_message_16(errornumber, buffer, sizeof(buffer));
+		vResults.clear();
+		mSubMatches.clear();
+		isPattern = false;
+		iCurrentPosition = -1;
+		uiSubMatchesCount = 0;
+		m_PropCountOfItemsInSearchResult = 0;
+		SetLastError((const char16_t*)buffer);
+	}
+	return res;
 
 }
+
