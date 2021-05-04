@@ -652,7 +652,7 @@ void CAddInNative::SetLocale(const WCHAR_T* loc)
 #if !defined( __linux__ ) && !defined(__APPLE__) && !defined(__ANDROID__)
 	_wsetlocale(LC_ALL, L"");
 #else
-	setlocale(LC_ALL, "");
+	//setlocale(LC_ALL, "");
 #endif
 }
 
