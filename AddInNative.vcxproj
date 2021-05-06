@@ -227,6 +227,7 @@
       </PrecompiledHeader>
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</CompileAsManaged>
     </ClCompile>
+    <ClCompile Include="json.cpp" />
     <ClCompile Include="StrConv.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -240,6 +241,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AddInNative.h" />
+    <ClInclude Include="json.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="StrConv.h" />
   </ItemGroup>

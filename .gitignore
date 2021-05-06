@@ -282,3 +282,4 @@ __pycache__/
 /stdafx.o
 /lib/linux.zip
 /build_pcre2.sh
+/pcre2-10.36_linux

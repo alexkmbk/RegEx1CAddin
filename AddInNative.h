@@ -17,6 +17,7 @@
 #include <map>
 
 #include "StrConv.h"
+#include "json.h"
 
 #define MBCMAXSIZE  6 // максимальная длина символа мультибайтовой строки (для функции wcstombs)
 
@@ -46,6 +47,7 @@ public:
 		eMethSubMatchesCount,
 		eMethGetSubMatch,
 		eMethVersion,
+		eMethMatchesJSON,
         eMethLast      // Always last
     };
 
@@ -82,6 +84,7 @@ public:
     
 private:
  	bool search(tVariant* paParams);
+	bool searchJSON(tVariant* pvarRetValue, tVariant* paParams);
 	bool replace(tVariant* pvarRetValue, tVariant* paParams);
 	bool match(tVariant* pvarRetValue, tVariant* paParams);
 	bool getSubMatch(tVariant* pvarRetValue, tVariant* paParams);

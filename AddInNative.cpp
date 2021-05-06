@@ -85,12 +85,12 @@ CAddInNative::CAddInNative()
 	sPattern.clear();
 
 	if (mMethods.size() == 0) {
-		vMethods = { u"Matches", u"IsMatch", u"Next", u"Replace", u"Count", u"SubMatchesCount", u"GetSubMatch", u"Version" };
+		vMethods = { u"Matches", u"IsMatch", u"Next", u"Replace", u"Count", u"SubMatchesCount", u"GetSubMatch", u"Version", u"MatchesJSON" };
 		fillMap(mMethods, vMethods);
 	}
 
 	if (mMethods_ru.size() == 0) {
-		vMethods_ru = { u"НайтиСовпадения", u"Совпадает", u"Следующий", u"Заменить", u"Количество", u"КоличествоВложенныхГрупп", u"ПолучитьПодгруппу", u"Версия" };
+		vMethods_ru = { u"НайтиСовпадения", u"Совпадает", u"Следующий", u"Заменить", u"Количество", u"КоличествоВложенныхГрупп", u"ПолучитьПодгруппу", u"Версия", u"НайтиСовпаденияJSON" };
 		fillMap(mMethods_ru, vMethods_ru);
 	}
 
@@ -465,6 +465,8 @@ long CAddInNative::GetNParams(const long lMethodNum)
 	{
 	case eMethMatches:
 		return 3;
+	case eMethMatchesJSON:
+		return 3;
 	case eMethIsMatch:
 		return 2;
 	case eMethReplace:
@@ -484,6 +486,7 @@ bool CAddInNative::GetParamDefValue(const long lMethodNum, const long lParamNum,
 	switch (lMethodNum)
 	{
 	case eMethMatches:
+	case eMethMatchesJSON:
 	{
 		if (lParamNum == 1)
 		{
@@ -537,6 +540,8 @@ bool CAddInNative::HasRetVal(const long lMethodNum)
 	switch (lMethodNum)
 	{
 	case eMethNext:
+		return true;
+	case eMethMatchesJSON:
 		return true;
 	case eMethReplace:
 		return true;
@@ -601,6 +606,8 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		// Method acceps one argument of type BinaryData ant returns its copy
 	case eMethMatches:
 		break;
+	case eMethMatchesJSON:
+		return searchJSON(pvarRetValue, paParams);
 	case eMethIsMatch:
 	{
 		match(pvarRetValue, paParams);
@@ -852,6 +859,220 @@ bool CAddInNative::search(tVariant * paParams)
 	pcre2_match_data_free(match_data);
 	iCurrentPosition = -1;
 	m_PropCountOfItemsInSearchResult = vResults.size();
+	if (bClearPattern && pattern != NULL)
+		delete pattern;
+	return true;
+}
+
+
+bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
+{
+	SetLastError(u"");
+	vResults.clear();
+	mSubMatches.clear();
+	iCurrentPosition = -1;
+	uiSubMatchesCount = 0;
+	
+	TV_VT(pvarRetValue) = VTYPE_PWSTR;
+
+	std::basic_string<char16_t> res;
+	res.reserve(paParams[0].wstrLen * 6); // резервируем в 6 раз больше памяти, для целей экранирования
+
+	/*if (!m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (paParams[0].wstrLen * 6 + 1) * sizeof(char16_t)))
+	{
+		//memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(char16_t));
+		//pvarRetValue->wstrLen = res.length();
+		pvarRetValue->wstrLen = 0;
+		SetLastError(u"Failed to allocate memory");
+		if (bThrowExceptions)
+			return false;
+		else
+			return true;
+	}
+
+	char16_t* res = (char16_t*) pvarRetValue->pwstrVal;
+	size_t offset = 0;*/
+
+	//boost::wsmatch wsmMatch;
+	pcre2_code* pattern = NULL;
+	bool bClearPattern = false;
+
+	bHierarchicalResultIteration = paParams[2].bVal;
+
+	if (paParams[1].wstrLen == 0)
+	{
+		if (isPattern)
+			pattern = rePattern;
+		else
+			if (bThrowExceptions) {
+				SetLastError(u"The regexp template is not specified.");
+				return false;
+			}
+			else
+				return true;
+	}
+	else
+	{
+		bClearPattern = true;
+		pattern = GetPattern(paParams, 1);
+	}
+
+	if (pattern == NULL)
+	{
+		if (bThrowExceptions)
+			return false;
+		else
+			return true;
+	}
+
+	int crlf_is_newline;
+	uint32_t newline;
+
+	(void)pcre2_pattern_info(pattern, PCRE2_INFO_NEWLINE, &newline);
+	crlf_is_newline = newline == PCRE2_NEWLINE_ANY ||
+		newline == PCRE2_NEWLINE_CRLF ||
+		newline == PCRE2_NEWLINE_ANYCRLF;
+
+	PCRE2_SIZE start_offset = 0;
+	size_t rootIndex = 0;
+	int rc;
+
+	pcre2_match_data* match_data = pcre2_match_data_create_from_pattern(pattern, NULL);
+
+	//if (bHierarchicalResultIteration)
+	//	res +=  u'{'; // map
+		//res[offset++] = u'{';
+	//else
+		res +=  u'['; // array*/
+		//res[offset++] = u'{';
+	
+	//int utf8;
+	PCRE2_SIZE *ovector;
+
+	while (true) {
+		
+		uint32_t options = 0;
+
+		rc = pcre2_match(
+			pattern,                   /* the compiled pattern */
+			(PCRE2_SPTR16)paParams[0].pwstrVal,              /* the subject string */
+			paParams[0].wstrLen,       /* the length of the subject */
+			start_offset,                    /* start at offset 0 in the subject */
+			options,                    /* default options */
+			match_data,           /* block for storing the result */
+			NULL);
+
+		if (rc < 0)
+		{
+			if (rc == PCRE2_ERROR_NOMATCH) {
+				if (options == 0) break;
+				if (crlf_is_newline &&                      /* If CRLF is newline & */
+					start_offset < paParams[0].wstrLen - 1 &&    /* we are at CRLF, */
+					paParams[0].pwstrVal[start_offset] == u'\r' &&
+					paParams[0].pwstrVal[start_offset + 1] == u'\n')
+					start_offset += 1;
+				continue;
+			}
+				
+			/*case PCRE2_ERROR_NOMATCH: printf("No match\n"); break;
+				/*
+				Handle other special cases if you like
+				*/
+				//default: printf("Matching error %d\n", rc); break;
+			pcre2_match_data_free(match_data);   /* Release memory used for the match */
+			//pcre2_code_free(pattern);                 /*   data and the compiled pattern. */
+			if (bThrowExceptions)
+				return false;
+			else
+				return true;
+		}
+		else if (rc == 0) {
+			break;
+		}
+		ovector = pcre2_get_ovector_pointer(match_data);
+
+		//std::basic_string<char16_t> r;
+		
+
+			/*if (crlf_is_newline &&                      /* If CRLF is newline & */
+				/*start_offset < paParams[0].wstrLen - 1 &&    /* we are at CRLF, */
+				/*paParams[0].pwstrVal[start_offset] == u'\r' &&
+				paParams[0].pwstrVal[start_offset + 1] == u'\n')
+				ovector[1] += 1;*/
+
+			//r.assign((char16_t*)(paParams[0].pwstrVal + ovector[0]), ovector[1] - ovector[0]);
+			//res[offset++] = u'\"';
+			//offset += append_escaped_json(res + offset, (char16_t*)paParams[0].pwstrVal, ovector[0], ovector[1] - 1);
+			
+			//append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[0], ovector[1] - 1);
+			if (bHierarchicalResultIteration)
+			{
+				res += u'[';
+				for (int i = 0; i < rc; i++)
+				{
+					res += u'\"';
+					append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
+					res.append(u"\",", (sizeof(u"\",") - 2) / sizeof(char16_t));
+					//r.assign((char16_t*)(paParams[0].pwstrVal + ovector[2 * i]), ovector[2 * i + 1] - ovector[2 * i]);
+					//res[offset++] = u'\"';
+					//offset += append_escaped_json(res + offset, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
+					//memcpy(res + offset, u"\",", sizeof(u"\",") - 2);
+					//offset += 2;
+				}
+				res += u']';
+				//memcpy(res + offset, u"\":[", sizeof(u"\":[") - 2);
+				//offset += (sizeof(u"\":[") - 2)/sizeof(char16_t);
+				//res.append(r);
+				//res.append(u"\":[", (sizeof(u"\":[") - 2) / sizeof(char16_t));
+				//res = res + u"\"" + r + u"\":[";
+			}
+			else {
+				for (int i = 0; i < rc; i++)
+				{
+					res += u'\"';
+					append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
+					res.append(u"\",", (sizeof(u"\",") - 2) / sizeof(char16_t));
+					//r.assign((char16_t*)(paParams[0].pwstrVal + ovector[2 * i]), ovector[2 * i + 1] - ovector[2 * i]);
+					//res[offset++] = u'\"';
+					//offset += append_escaped_json(res + offset, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
+					//memcpy(res + offset, u"\",", sizeof(u"\",") - 2);
+					//offset += 2;
+				}
+				//res = res + u"\"" + r + u"\",";
+				//memcpy(res + offset, u"\",", sizeof(u"\",") - 2);
+				//offset += 2;
+				//res.append(u"\",", (sizeof(u"\",") - 2) / sizeof(char16_t));
+			}
+		
+			//res = res + u"],";
+
+
+		if (bGlobal) {
+			start_offset = ovector[1];
+		}
+		else
+			break;
+	}
+
+	//if (bHierarchicalResultIteration)
+	//	res += u'}'; // map
+		//res[offset++] = u'}';
+	//else
+		res += u']'; // array
+		//res[offset++] = u']';
+
+	uiSubMatchesCount = rc - 1;
+
+	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
+	{
+		memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(char16_t));
+		pvarRetValue->wstrLen = res.length();
+	}
+	//pvarRetValue->wstrLen = offset;
+	
+	pcre2_match_data_free(match_data);
+	iCurrentPosition = -1;
+	m_PropCountOfItemsInSearchResult = 0;
 	if (bClearPattern && pattern != NULL)
 		delete pattern;
 	return true;
