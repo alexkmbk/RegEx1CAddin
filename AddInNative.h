@@ -1,8 +1,6 @@
 ﻿#ifndef __ADDINNATIVE_H__
 #define __ADDINNATIVE_H__
 
-//#include "boost/regex.hpp"
-
 #define PCRE2_STATIC
 #define PCRE2_CODE_UNIT_WIDTH 16
 //#define PCRE2_LOCAL_WIDTH 16
@@ -19,7 +17,7 @@
 #include "StrConv.h"
 #include "json.h"
 
-#define MBCMAXSIZE  6 // максимальная длина символа мультибайтовой строки (для функции wcstombs)
+//#define MBCMAXSIZE  6 // максимальная длина символа мультибайтовой строки (для функции wcstombs)
 
 struct ResultStruct {
 	std::basic_string<char16_t> value;

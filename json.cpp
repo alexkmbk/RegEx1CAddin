@@ -18,8 +18,6 @@ void escape(char16_t x, char16_t* res) {
 void append_escaped_json(std::basic_string<char16_t> &out, const char16_t* in, size_t begin, size_t end) {
 	for (size_t i = begin; i <= end; i++) {
 		char16_t c = in[i];
-/*		if (i == begin && (c == u'\n' || c == u'\r'))
-			continue;*/
 		switch (c) {
 		case u'"': out.append(u"\\\"", 2); break;
 		case u'\\': out.append(u"\\\\", (sizeof(u"\\\\") / sizeof(char16_t)) - 1); break;
