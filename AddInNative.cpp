@@ -84,12 +84,12 @@ CAddInNative::CAddInNative()
 	sPattern.clear();
 
 	if (mMethods.size() == 0) {
-		vMethods = { u"Matches", u"IsMatch", u"Next", u"Replace", u"Count", u"SubMatchesCount", u"GetSubMatch", u"Version", u"MatchesJSON" };
+		vMethods = { u"Matches", u"IsMatch", u"Next", u"Replace", u"Count", u"SubMatchesCount", u"GetSubMatch", u"Version", u"MatchesJSON", u"Test" };
 		fillMap(mMethods, vMethods);
 	}
 
 	if (mMethods_ru.size() == 0) {
-		vMethods_ru = { u"НайтиСовпадения", u"Совпадает", u"Следующий", u"Заменить", u"Количество", u"КоличествоВложенныхГрупп", u"ПолучитьПодгруппу", u"Версия", u"НайтиСовпаденияJSON" };
+		vMethods_ru = { u"НайтиСовпадения", u"Совпадает", u"Следующий", u"Заменить", u"Количество", u"КоличествоВложенныхГрупп", u"ПолучитьПодгруппу", u"Версия", u"НайтиСовпаденияJSON", u"Test" };
 		fillMap(mMethods_ru, vMethods_ru);
 	}
 
@@ -320,37 +320,22 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 	}
 	case ePropPattern:
 	{
-		int errornumber;
-		PCRE2_SIZE erroroffset = NULL;
-
 		if (rePattern != NULL)
 			pcre2_code_free(rePattern);
 
-		sPattern.assign((char16_t*)varPropVal->pwstrVal, varPropVal->wstrLen);
-		rePattern = pcre2_compile((PCRE2_SPTR16)(varPropVal->pwstrVal),               /* the pattern */
-			varPropVal->wstrLen, /* indicates pattern is zero-terminated */
-			PCRE2_UTF | (bIgnoreCase ? PCRE2_CASELESS : 0), /* options */
-			&errornumber,          /* for error number */
-			&erroroffset,          /* for error offset */
-			NULL);
+		sPattern.clear();
 
+		rePattern = GetPattern((char16_t*)varPropVal->pwstrVal, varPropVal->wstrLen);
 		if (rePattern == NULL)
 		{
-			PCRE2_UCHAR buffer[256];
-			pcre2_get_error_message_16(errornumber, buffer, sizeof(buffer));
-			vResults.clear();
-			mSubMatches.clear();
 			isPattern = false;
-			iCurrentPosition = -1;
-			uiSubMatchesCount = 0;
-			m_PropCountOfItemsInSearchResult = 0;
-			SetLastError((const char16_t*)buffer);
 			if (bThrowExceptions)
 				return false;
 			else
 				return true;
 		}
 
+		sPattern.assign((char16_t*)varPropVal->pwstrVal, varPropVal->wstrLen);
 		isPattern = true;
 		return true;
 	}
@@ -474,6 +459,8 @@ long CAddInNative::GetNParams(const long lMethodNum)
 		return 3;
 	case eMethIsMatch:
 		return 2;
+	case eMethTest:
+		return 2;
 	case eMethReplace:
 		return 3;
 	case eMethGetSubMatch:
@@ -508,6 +495,7 @@ bool CAddInNative::GetParamDefValue(const long lMethodNum, const long lParamNum,
 		break;
 	}
 	case eMethIsMatch:
+	case eMethTest:
 	{
 		if (lParamNum == 1)
 		{
@@ -551,6 +539,7 @@ bool CAddInNative::HasRetVal(const long lMethodNum)
 	case eMethReplace:
 		return true;
 	case eMethIsMatch:
+	case eMethTest:
 		return true;
 	case eMethCount:
 		return true;
@@ -575,6 +564,7 @@ bool CAddInNative::CallAsProc(const long lMethodNum,
 	case eMethMatches:
 		return search(paParams);
 	case eMethIsMatch:
+	case eMethTest:
 		break;
 	case eMethReplace:
 		break;
@@ -614,6 +604,7 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 	case eMethMatchesJSON:
 		return searchJSON(pvarRetValue, paParams);
 	case eMethIsMatch:
+	case eMethTest:
 	{
 		match(pvarRetValue, paParams);
 		return true;
@@ -699,7 +690,7 @@ bool CAddInNative::search(tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern(paParams, 1);
+		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
 	}
 
 	if (pattern == NULL)
@@ -744,6 +735,16 @@ bool CAddInNative::search(tVariant * paParams)
 			break;
 		}
 		PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+
+		if (ovector[0] > ovector[1])
+		{
+			SetLastError(u"\\K was used in an assertion to set the match start after its end.");
+			pcre2_match_data_free(match_data);
+			if (bThrowExceptions)
+				return false;
+			else
+				return true;
+		}
 
 		std::vector<std::basic_string<char16_t>> vSubMatches;
 
@@ -802,7 +803,7 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	pcre2_code* pattern = NULL;
 	bool bClearPattern = false;
 
-	bHierarchicalResultIteration = paParams[2].bVal;
+	bool bIntervals = paParams[2].bVal;
 
 	if (paParams[1].wstrLen == 0)
 	{
@@ -812,7 +813,7 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern(paParams, 1);
+		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
 	}
 
 	if (pattern == NULL)
@@ -859,20 +860,16 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 		if (rc < 0)
 		{
 			if (rc == PCRE2_ERROR_NOMATCH) {
-				if (options == 0) break;
+				if (options == 0) 
+					break;
 				if (crlf_is_newline &&                      /* If CRLF is newline & */
 					start_offset < paParams[0].wstrLen - 1 &&    /* we are at CRLF, */
 					paParams[0].pwstrVal[start_offset] == u'\r' &&
 					paParams[0].pwstrVal[start_offset + 1] == u'\n')
 					start_offset += 1;
 				continue;
-			}
-				
-			/*case PCRE2_ERROR_NOMATCH: printf("No match\n"); break;
-				/*
-				Handle other special cases if you like
-				*/
-				//default: printf("Matching error %d\n", rc); break;
+			}				
+			SetLastError(u"Matching error");
 			pcre2_match_data_free(match_data);   /* Release memory used for the match */
 
 			if (bThrowExceptions)
@@ -881,6 +878,7 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 				return true;
 		}
 		else if (rc == 0) {
+			SetLastError(u"ovector was not big enough for all the captured substrings.");
 			break;
 		}
 
@@ -896,29 +894,50 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 				return true;
 		}
 
-		res.append(u"{\"Value\":\"", (sizeof(u"{\"Value\":\"") - 2) / sizeof(char16_t));
-		append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[0], ovector[1] - 1);
-		res.append(u"\",\"FirstIndex\":", (sizeof(u"\",\"FirstIndex\":") - 2) / sizeof(char16_t));
-		
-		char16_t snum[20];
-
-		int len = itoa_u16(ovector[0], snum, 10, 10);
-		res.append(snum, len);
-
-		res.append(u",\"Length\":", (sizeof(u",\"Length\":") - 2) / sizeof(char16_t));
-
-		len = itoa_u16(ovector[1] - ovector[0], snum, 10, 10);
-		res.append(snum, len);
-		res.append(u",\"SubMatches\":[", (sizeof(u",\"SubMatches\":[") - 2) / sizeof(char16_t));
-		
-				for (int i = 1; i < rc; i++)
-				{
-					res += u'\"';
-					append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
-					res.append(u"\",", (sizeof(u"\",") - 2) / sizeof(char16_t));
+		if (bIntervals)
+		{
+			res += u'[';
+			for (int i = 0; i < rc; i++)
+			{
+				if (ovector[2 * i] == ovector[2 * i + 1]) {
+					res.append(u"0,0,", (sizeof(u"0,0,") - 2) / sizeof(char16_t));
+					continue;
 				}
-				res.append(u"]},", (sizeof(u"]},") - 2) / sizeof(char16_t));
+				char16_t snum[20];
+				int len = itoa_u16(ovector[2 * i], snum, 20, 10);
+				res.append(snum, len);
+				res += u',';
+				len = itoa_u16(ovector[2 * i + 1], snum, 20, 10);
+				res.append(snum, len);
+				res += u',';
+			}
+			res += u']';
+		}
+		else
+		{
+			res.append(u"{\"Value\":\"", (sizeof(u"{\"Value\":\"") - 2) / sizeof(char16_t));
+			append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[0], ovector[1] - 1);
+			res.append(u"\",\"FirstIndex\":", (sizeof(u"\",\"FirstIndex\":") - 2) / sizeof(char16_t));
 
+			char16_t snum[20];
+
+			int len = itoa_u16(ovector[0], snum, 20, 10);
+			res.append(snum, len);
+
+			res.append(u",\"Length\":", (sizeof(u",\"Length\":") - 2) / sizeof(char16_t));
+
+			len = itoa_u16(ovector[1] - ovector[0], snum, 10, 10);
+			res.append(snum, len);
+			res.append(u",\"SubMatches\":[", (sizeof(u",\"SubMatches\":[") - 2) / sizeof(char16_t));
+
+			for (int i = 1; i < rc; i++)
+			{
+				res += u'\"';
+				append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
+				res.append(u"\",", (sizeof(u"\",") - 2) / sizeof(char16_t));
+			}
+			res.append(u"]},", (sizeof(u"]},") - 2) / sizeof(char16_t));
+		}
 		if (bGlobal) {
 			start_offset = ovector[1];
 			/*if (crlf_is_newline &&                      // If CRLF is newline & 
@@ -948,7 +967,6 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 		memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(char16_t));
 		pvarRetValue->wstrLen = res.length();
 	}
-	//pvarRetValue->wstrLen = offset;
 	
 	pcre2_match_data_free(match_data);
 	iCurrentPosition = -1;
@@ -978,7 +996,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern(paParams, 1);
+		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
 	}
 
 	PCRE2_SIZE start_offset = 0;
@@ -1132,7 +1150,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern(paParams, 1);
+		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
 	}
 
 	if (pattern == NULL)
@@ -1269,17 +1287,17 @@ void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const lon
 #endif
 }
 
-pcre2_code*  CAddInNative::GetPattern(tVariant* paParams, const long paramIndex) {
+pcre2_code*  CAddInNative::GetPattern(const char16_t* patternStr, const long len) {
 
 	int errornumber;
 	PCRE2_SIZE erroroffset = NULL;
 	pcre2_code* res;
 
-	res = pcre2_compile((PCRE2_SPTR16)(paParams[paramIndex]).pwstrVal,               /* the pattern */
-		paParams[paramIndex].wstrLen, /* indicates pattern is zero-terminated */
-		PCRE2_UTF|(bIgnoreCase ? PCRE2_CASELESS : 0), /* options */
-		&errornumber,          /* for error number */
-		&erroroffset,          /* for error offset */
+	res = pcre2_compile((PCRE2_SPTR16)patternStr,               // the pattern 
+		len, // indicates pattern is zero-terminated 
+		PCRE2_UTF|(bIgnoreCase ? PCRE2_CASELESS : 0), // options 
+		&errornumber,          // for error number 
+		&erroroffset,          // for error offset 
 		NULL);
 
 	if (res == NULL)
@@ -1288,13 +1306,12 @@ pcre2_code*  CAddInNative::GetPattern(tVariant* paParams, const long paramIndex)
 		pcre2_get_error_message_16(errornumber, buffer, sizeof(buffer));
 		vResults.clear();
 		mSubMatches.clear();
-		isPattern = false;
 		iCurrentPosition = -1;
 		uiSubMatchesCount = 0;
 		m_PropCountOfItemsInSearchResult = 0;
 		SetLastError((const char16_t*)buffer);
 	}
-	return res;
 
+	return res;
 }
 

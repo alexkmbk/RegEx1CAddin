@@ -51,6 +51,7 @@ public:
 		eMethGetSubMatch,
 		eMethVersion,
 		eMethMatchesJSON,
+		eMethTest,
         eMethLast      // Always last
     };
 
@@ -95,7 +96,7 @@ private:
 	void SetLastError(const char16_t* error);
 
 	void GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex);
-	pcre2_code* GetPattern(tVariant* paParams, const long paramIndex);
+	pcre2_code* GetPattern(const char16_t* patternStr, const long len);
 
     // Attributes
     IAddInDefBase      *m_iConnect;
