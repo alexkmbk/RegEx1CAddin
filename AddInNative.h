@@ -21,6 +21,10 @@
 
 #define MBCMAXSIZE  6 // максимальная длина символа мультибайтовой строки (для функции wcstombs)
 
+struct ResultStruct {
+	std::basic_string<char16_t> value;
+	size_t firstIndex;
+};
 ///////////////////////////////////////////////////////////////////////////////
 // class CAddInNative
 class CAddInNative : public IComponentBase
@@ -34,6 +38,7 @@ public:
 		ePropThrowExceptions,
 		ePropPattern,
 		ePropGlobal,
+		ePropFirstIndex,
         ePropLast      // Always last
     };
 
@@ -99,7 +104,7 @@ private:
     IMemoryManager     *m_iMemory;
 
 	int m_PropCountOfItemsInSearchResult;
-	std::vector<std::basic_string<char16_t>> vResults;
+	std::vector<ResultStruct> vResults;
 	std::map<size_t, std::vector<std::basic_string<char16_t>>> mSubMatches;
 	int iCurrentPosition;
 	std::basic_string<char16_t> sErrorDescription;

@@ -95,12 +95,12 @@ CAddInNative::CAddInNative()
 	}
 
 	if (mProps.size() == 0) {
-		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global" };
+		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global", u"FirstIndex"};
 		fillMap(mProps, vProps);
 	}
 
 	if (mProps_ru.size() == 0) {
-		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения" };
+		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения", u"FirstIndex"};
 		fillMap(mProps_ru, vProps_ru);
 	}
 }
@@ -214,7 +214,7 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 			wsCurrentValue = &emptyStr;
 		}
 		else
-			wsCurrentValue = &vResults[iCurrentPosition];
+			wsCurrentValue = &(vResults[iCurrentPosition].value);
 
 		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue->length() + 1) * sizeof(wchar_t)))
 		{
@@ -223,6 +223,23 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 			return true;
 		}
 		return false;
+	};
+	case ePropFirstIndex:
+	{
+		TV_VT(pvarPropVal) = VTYPE_I4;
+	
+
+		size_t firstIndex;
+		if (vResults.size() == 0 || iCurrentPosition == -1 || iCurrentPosition >= vResults.size())
+		{
+			firstIndex = 0;
+		}
+		else
+			firstIndex = vResults[iCurrentPosition].firstIndex;
+
+		pvarPropVal->lVal = firstIndex;
+
+		return true;
 	};
 	case ePropErrorDescription:
 	{
@@ -368,6 +385,8 @@ bool CAddInNative::IsPropReadable(const long lPropNum)
 	switch (lPropNum)
 	{
 	case ePropCurrentValue:
+		return true;
+	case ePropFirstIndex:
 		return true;
 	case ePropErrorDescription:
 		return true;
@@ -754,18 +773,22 @@ bool CAddInNative::search(tVariant * paParams)
 
 		for (int i = 0; i < rc; i++)
 		{
-			std::basic_string<char16_t> r;
+			ResultStruct resultStruct;
 
-			r.assign((char16_t*)(paParams[0].pwstrVal + ovector[2 * i]), ovector[2 * i + 1] - ovector[2 * i]);
+			resultStruct.value.assign((char16_t*)(paParams[0].pwstrVal + ovector[2 * i]), ovector[2 * i + 1] - ovector[2 * i]);
 
 			if (i == 0 && bHierarchicalResultIteration) {
-				vResults.push_back(r);
+				
+				resultStruct.firstIndex = ovector[2 * i];
+				vResults.push_back(resultStruct);
 				rootIndex = vResults.size() - 1;
 			}
 			else if (bHierarchicalResultIteration)
-				vSubMatches.push_back(r);
-			else if (!bHierarchicalResultIteration)
-				vResults.push_back(r);
+				vSubMatches.push_back(resultStruct.value);
+			else if (!bHierarchicalResultIteration) {
+				resultStruct.firstIndex = ovector[2 * i];
+				vResults.push_back(resultStruct);
+			}
 		}
 		if (bHierarchicalResultIteration)
 			mSubMatches.insert({ rootIndex, vSubMatches});
@@ -876,24 +899,8 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 
 	std::basic_string<char16_t> res;
-	res.reserve(paParams[0].wstrLen * 6); // резервируем в 6 раз больше памяти, для целей экранирования
+	res.reserve(paParams[0].wstrLen); // мы не знаем сколько памяти потребуется, поэтому выделим тот объем, который занимает исходный текст
 
-	/*if (!m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (paParams[0].wstrLen * 6 + 1) * sizeof(char16_t)))
-	{
-		//memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(char16_t));
-		//pvarRetValue->wstrLen = res.length();
-		pvarRetValue->wstrLen = 0;
-		SetLastError(u"Failed to allocate memory");
-		if (bThrowExceptions)
-			return false;
-		else
-			return true;
-	}
-
-	char16_t* res = (char16_t*) pvarRetValue->pwstrVal;
-	size_t offset = 0;*/
-
-	//boost::wsmatch wsmMatch;
 	pcre2_code* pattern = NULL;
 	bool bClearPattern = false;
 
@@ -939,12 +946,7 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 
 	pcre2_match_data* match_data = pcre2_match_data_create_from_pattern(pattern, NULL);
 
-	//if (bHierarchicalResultIteration)
-	//	res +=  u'{'; // map
-		//res[offset++] = u'{';
-	//else
-		res +=  u'['; // array*/
-		//res[offset++] = u'{';
+	res +=  u'['; // array
 	
 	//int utf8;
 	PCRE2_SIZE *ovector;
@@ -989,77 +991,53 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 		else if (rc == 0) {
 			break;
 		}
+
 		ovector = pcre2_get_ovector_pointer(match_data);
 
-		//std::basic_string<char16_t> r;
+		res.append(u"{\"Value\":\"", (sizeof(u"{\"Value\":\"") - 2) / sizeof(char16_t));
+		append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[0], ovector[1] - 1);
+		res.append(u"\",\"FirstIndex\":", (sizeof(u"\",\"FirstIndex\":") - 2) / sizeof(char16_t));
 		
+		char16_t snum[20];
 
-			/*if (crlf_is_newline &&                      /* If CRLF is newline & */
-				/*start_offset < paParams[0].wstrLen - 1 &&    /* we are at CRLF, */
-				/*paParams[0].pwstrVal[start_offset] == u'\r' &&
-				paParams[0].pwstrVal[start_offset + 1] == u'\n')
-				ovector[1] += 1;*/
+		int len = itoa_u16(ovector[0], snum, 10, 10);
+		res.append(snum, len);
 
-			//r.assign((char16_t*)(paParams[0].pwstrVal + ovector[0]), ovector[1] - ovector[0]);
-			//res[offset++] = u'\"';
-			//offset += append_escaped_json(res + offset, (char16_t*)paParams[0].pwstrVal, ovector[0], ovector[1] - 1);
-			
-			//append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[0], ovector[1] - 1);
-			if (bHierarchicalResultIteration)
-			{
-				res += u'[';
-				for (int i = 0; i < rc; i++)
+		res.append(u",\"Length\":", (sizeof(u",\"Length\":") - 2) / sizeof(char16_t));
+
+		len = itoa_u16(ovector[1] - ovector[0], snum, 10, 10);
+		res.append(snum, len);
+		res.append(u",\"SubMatches\":[", (sizeof(u",\"SubMatches\":[") - 2) / sizeof(char16_t));
+		
+				for (int i = 1; i < rc; i++)
 				{
 					res += u'\"';
 					append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
 					res.append(u"\",", (sizeof(u"\",") - 2) / sizeof(char16_t));
-					//r.assign((char16_t*)(paParams[0].pwstrVal + ovector[2 * i]), ovector[2 * i + 1] - ovector[2 * i]);
-					//res[offset++] = u'\"';
-					//offset += append_escaped_json(res + offset, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
-					//memcpy(res + offset, u"\",", sizeof(u"\",") - 2);
-					//offset += 2;
 				}
-				res += u']';
-				//memcpy(res + offset, u"\":[", sizeof(u"\":[") - 2);
-				//offset += (sizeof(u"\":[") - 2)/sizeof(char16_t);
-				//res.append(r);
-				//res.append(u"\":[", (sizeof(u"\":[") - 2) / sizeof(char16_t));
-				//res = res + u"\"" + r + u"\":[";
-			}
-			else {
-				for (int i = 0; i < rc; i++)
-				{
-					res += u'\"';
-					append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
-					res.append(u"\",", (sizeof(u"\",") - 2) / sizeof(char16_t));
-					//r.assign((char16_t*)(paParams[0].pwstrVal + ovector[2 * i]), ovector[2 * i + 1] - ovector[2 * i]);
-					//res[offset++] = u'\"';
-					//offset += append_escaped_json(res + offset, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
-					//memcpy(res + offset, u"\",", sizeof(u"\",") - 2);
-					//offset += 2;
-				}
-				//res = res + u"\"" + r + u"\",";
-				//memcpy(res + offset, u"\",", sizeof(u"\",") - 2);
-				//offset += 2;
-				//res.append(u"\",", (sizeof(u"\",") - 2) / sizeof(char16_t));
-			}
-		
-			//res = res + u"],";
-
+				res.append(u"]},", (sizeof(u"]},") - 2) / sizeof(char16_t));
 
 		if (bGlobal) {
 			start_offset = ovector[1];
+			/*if (crlf_is_newline &&                      // If CRLF is newline & 
+				start_offset < paParams[0].wstrLen - 1 &&    // we are at CRLF, 
+				paParams[0].pwstrVal[start_offset] == u'\r' &&
+				paParams[0].pwstrVal[start_offset + 1] == u'\n'){ 
+				start_offset += 2;
+			}
+			else if (crlf_is_newline &&                      // If CRLF is newline & 
+				start_offset < paParams[0].wstrLen - 1 &&
+				start_offset > 0 &&
+				paParams[0].pwstrVal[start_offset - 1] == u'\r' && // we are at CRLF, 
+				paParams[0].pwstrVal[start_offset] == u'\n') {
+				start_offset += 1;
+			}*/
 		}
 		else
 			break;
 	}
 
-	//if (bHierarchicalResultIteration)
-	//	res += u'}'; // map
-		//res[offset++] = u'}';
-	//else
-		res += u']'; // array
-		//res[offset++] = u']';
+	res += u']'; // array
 
 	uiSubMatchesCount = rc - 1;
 
