@@ -76,6 +76,7 @@ CAddInNative::CAddInNative()
 	sErrorDescription = u"";
 	bThrowExceptions = false;
 	bIgnoreCase = false;
+	bMultiline = false;
 	isPattern = false;
 	bGlobal = false;
 	bHierarchicalResultIteration = false;
@@ -94,12 +95,12 @@ CAddInNative::CAddInNative()
 	}
 
 	if (mProps.size() == 0) {
-		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global", u"FirstIndex"};
+		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global", u"FirstIndex", u"Multiline"};
 		fillMap(mProps, vProps);
 	}
 
 	if (mProps_ru.size() == 0) {
-		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения", u"FirstIndex"};
+		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения", u"FirstIndex", u"Многострочный"};
 		fillMap(mProps_ru, vProps_ru);
 	}
 }
@@ -282,6 +283,12 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 			return true;
 		}
 	}
+	case ePropMultiline:
+	{
+		TV_VT(pvarPropVal) = VTYPE_BOOL;
+		pvarPropVal->bVal = bMultiline;
+		return true;
+	}
 	case ePropGlobal:
 	{
 		TV_VT(pvarPropVal) = VTYPE_BOOL;
@@ -344,6 +351,11 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 		bGlobal = TV_BOOL(varPropVal);
 		return true;
 	}
+	case ePropMultiline:
+	{
+		bMultiline = TV_BOOL(varPropVal);
+		return true;
+	}
 	default:
 		return false;
 	}
@@ -369,6 +381,8 @@ bool CAddInNative::IsPropReadable(const long lPropNum)
 		return true;
 	case ePropGlobal:
 		return true;
+	case ePropMultiline:
+		return true;
 	default:
 		return false;
 	}
@@ -387,6 +401,8 @@ bool CAddInNative::IsPropWritable(const long lPropNum)
 	case ePropPattern:
 		return true;
 	case ePropGlobal:
+		return true;
+	case ePropMultiline:
 		return true;
 	default:
 		return false;
@@ -676,7 +692,6 @@ bool CAddInNative::search(tVariant * paParams)
 	iCurrentPosition = -1;
 	uiSubMatchesCount = 0;
 
-	//boost::wsmatch wsmMatch;
 	pcre2_code* pattern = NULL;
 	bool bClearPattern = false;
 
@@ -702,29 +717,81 @@ bool CAddInNative::search(tVariant * paParams)
 			return true;
 	}
 
-	PCRE2_SIZE start_offset = 0;
+	int crlf_is_newline;
+	uint32_t newline;
+
+	(void)pcre2_pattern_info(pattern, PCRE2_INFO_NEWLINE, &newline);
+	crlf_is_newline = newline == PCRE2_NEWLINE_ANY ||
+		newline == PCRE2_NEWLINE_CRLF ||
+		newline == PCRE2_NEWLINE_ANYCRLF;
+
 	size_t rootIndex = 0;
 	int rc;
 
 	pcre2_match_data* match_data = pcre2_match_data_create_from_pattern(pattern, NULL);
 
+	PCRE2_SIZE *ovector = NULL;
+
 	while (true) {
+
+		uint32_t options = 0;
+
+		PCRE2_SIZE start_offset = ovector == NULL ? 0 : ovector[1];   /* Start at end of previous match */
+		size_t subject_length = paParams[0].wstrLen;
+
+		if (ovector != NULL && (ovector[0] == ovector[1]))
+		{
+			if (ovector[0] == subject_length) break;
+			options = PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED;
+		}
+		else if (ovector != NULL)
+		{
+			PCRE2_SIZE startchar = pcre2_get_startchar(match_data);
+			if (start_offset <= startchar)
+			{
+				if (startchar >= subject_length) break;   /* Reached end of subject.   */
+				start_offset = startchar + 1;             /* Advance by one character. */
+				/* If UTF-8, it may be more  */
+				/*   than one code unit.     */
+					/*for (; start_offset < subject_length; start_offset++)
+						if ((paParams[0].pwstrVal[start_offset] & 0xc0) != 0x80)
+							break;				*/
+			}
+		}
+
+		if (start_offset >= subject_length)
+			break;
 		rc = pcre2_match(
 			pattern,                   /* the compiled pattern */
 			(PCRE2_SPTR16)paParams[0].pwstrVal,              /* the subject string */
 			paParams[0].wstrLen,       /* the length of the subject */
 			start_offset,                    /* start at offset 0 in the subject */
-			0,                    /* default options */
+			options,                    /* default options */
 			match_data,           /* block for storing the result */
 			NULL);
 
+		if (rc == PCRE2_ERROR_NOMATCH)
+		{
+			if (options == 0) break;                    /* All matches found */
+			ovector[1] = start_offset + 1;              /* Advance one code unit */
+			if (crlf_is_newline &&                      /* If CRLF is a newline & */
+				start_offset < subject_length - 1 &&    /* we are at CRLF, */
+				paParams[0].pwstrVal[start_offset] == '\r' &&
+				paParams[0].pwstrVal[start_offset + 1] == '\n')
+				ovector[1] += 1;                          /* Advance by one more. */
+				/*while (ovector[1] < subject_length)
+				{
+					if ((paParams[0].pwstrVal[ovector[1]] & 0xc0) != 0x80)
+						break;
+					ovector[1] += 1;
+				}*/
+			continue;    /* Go round the loop again */
+		}
+
 		if (rc < 0)
 		{
-			if (rc == PCRE2_ERROR_NOMATCH)
-				break;
 			SetLastError(u"Matching error");
 			pcre2_match_data_free(match_data);   /* Release memory used for the match */
-			//pcre2_code_free(pattern);                 /*   data and the compiled pattern. */
 			if (bThrowExceptions)
 				return false;
 			else
@@ -734,7 +801,8 @@ bool CAddInNative::search(tVariant * paParams)
 			SetLastError(u"ovector was not big enough for all the captured substrings.");
 			break;
 		}
-		PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+
+		ovector = pcre2_get_ovector_pointer(match_data);
 
 		if (ovector[0] > ovector[1])
 		{
@@ -745,10 +813,11 @@ bool CAddInNative::search(tVariant * paParams)
 			else
 				return true;
 		}
+		uiSubMatchesCount = pcre2_get_ovector_count(match_data) - 1;
 
 		std::vector<std::basic_string<char16_t>> vSubMatches;
 
-		for (int i = 0; i < rc; i++)
+		for (int i = 0; i <= uiSubMatchesCount; i++)
 		{
 			ResultStruct resultStruct;
 
@@ -769,19 +838,15 @@ bool CAddInNative::search(tVariant * paParams)
 		}
 		if (bHierarchicalResultIteration)
 			mSubMatches.insert({ rootIndex, vSubMatches});
-		if (bGlobal)
-			start_offset = ovector[1];
-		else
+		if (!bGlobal) 
 			break;
 	}
-	uiSubMatchesCount = rc - 1;
 
 	pcre2_match_data_free(match_data);
 	iCurrentPosition = -1;
 	m_PropCountOfItemsInSearchResult = vResults.size();
 	if (bClearPattern && pattern != NULL) {
 		pcre2_code_free(pattern);
-		delete pattern;
 	}
 	return true;
 }
@@ -833,7 +898,6 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 		newline == PCRE2_NEWLINE_CRLF ||
 		newline == PCRE2_NEWLINE_ANYCRLF;
 
-	PCRE2_SIZE start_offset = 0;
 	size_t rootIndex = 0;
 	int rc;
 
@@ -841,13 +905,37 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 
 	res +=  u'['; // array
 	
-	//int utf8;
-	PCRE2_SIZE *ovector;
+	PCRE2_SIZE *ovector = NULL;
 
 	while (true) {
-		
+
 		uint32_t options = 0;
 
+		PCRE2_SIZE start_offset = ovector == NULL ? 0 : ovector[1];   /* Start at end of previous match */
+		size_t subject_length = paParams[0].wstrLen;
+
+		if (ovector != NULL && (ovector[0] == ovector[1]))
+		{
+			if (ovector[0] == subject_length) break;
+			options = PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED;
+		}
+		else if (ovector != NULL)
+		{
+			PCRE2_SIZE startchar = pcre2_get_startchar(match_data);
+			if (start_offset <= startchar)
+			{
+				if (startchar >= subject_length) break;   /* Reached end of subject.   */
+				start_offset = startchar + 1;             /* Advance by one character. */
+				/* If UTF-8, it may be more  */
+				/*   than one code unit.     */
+					/*for (; start_offset < subject_length; start_offset++)
+						if ((paParams[0].pwstrVal[start_offset] & 0xc0) != 0x80) 
+							break;				*/
+			}
+		}
+
+		if (start_offset >= subject_length)
+			break;
 		rc = pcre2_match(
 			pattern,                   /* the compiled pattern */
 			(PCRE2_SPTR16)paParams[0].pwstrVal,              /* the subject string */
@@ -857,21 +945,28 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 			match_data,           /* block for storing the result */
 			NULL);
 
+		if (rc == PCRE2_ERROR_NOMATCH)
+		{
+			if (options == 0) break;                    /* All matches found */
+			ovector[1] = start_offset + 1;              /* Advance one code unit */
+			if (crlf_is_newline &&                      /* If CRLF is a newline & */
+				start_offset < subject_length - 1 &&    /* we are at CRLF, */
+				paParams[0].pwstrVal[start_offset] == '\r' &&
+				paParams[0].pwstrVal[start_offset + 1] == '\n')
+				ovector[1] += 1;                          /* Advance by one more. */
+				/*while (ovector[1] < subject_length)       
+				{
+					if ((paParams[0].pwstrVal[ovector[1]] & 0xc0) != 0x80) 
+						break;
+					ovector[1] += 1;
+				}*/
+			continue;    /* Go round the loop again */
+		}
+
 		if (rc < 0)
 		{
-			if (rc == PCRE2_ERROR_NOMATCH) {
-				if (options == 0) 
-					break;
-				if (crlf_is_newline &&                      /* If CRLF is newline & */
-					start_offset < paParams[0].wstrLen - 1 &&    /* we are at CRLF, */
-					paParams[0].pwstrVal[start_offset] == u'\r' &&
-					paParams[0].pwstrVal[start_offset + 1] == u'\n')
-					start_offset += 1;
-				continue;
-			}				
 			SetLastError(u"Matching error");
 			pcre2_match_data_free(match_data);   /* Release memory used for the match */
-
 			if (bThrowExceptions)
 				return false;
 			else
@@ -893,11 +988,12 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 			else
 				return true;
 		}
+		uiSubMatchesCount = pcre2_get_ovector_count(match_data) - 1;
 
 		if (bIntervals)
 		{
 			res += u'[';
-			for (int i = 0; i < rc; i++)
+			for (int i = 0; i <= uiSubMatchesCount; i++)
 			{
 				if (ovector[2 * i] == ovector[2 * i + 1]) {
 					res.append(u"0,0,", (sizeof(u"0,0,") - 2) / sizeof(char16_t));
@@ -916,7 +1012,9 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 		else
 		{
 			res.append(u"{\"Value\":\"", (sizeof(u"{\"Value\":\"") - 2) / sizeof(char16_t));
-			append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[0], ovector[1] - 1);
+
+			if (ovector[0] != ovector[1])
+				append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[0], ovector[1] - 1);
 			res.append(u"\",\"FirstIndex\":", (sizeof(u"\",\"FirstIndex\":") - 2) / sizeof(char16_t));
 
 			char16_t snum[20];
@@ -930,15 +1028,26 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 			res.append(snum, len);
 			res.append(u",\"SubMatches\":[", (sizeof(u",\"SubMatches\":[") - 2) / sizeof(char16_t));
 
-			for (int i = 1; i < rc; i++)
+			for (int i = 1; i <= uiSubMatchesCount; i++)
 			{
+				if (ovector[2 * i] == ovector[2 * i + 1]) {
+					res.append(u"null,", (sizeof(u"null,") - 2) / sizeof(char16_t));
+					continue;
+				}
 				res += u'\"';
 				append_escaped_json(res, (char16_t*)paParams[0].pwstrVal, ovector[2 * i], ovector[2 * i + 1] - 1);
 				res.append(u"\",", (sizeof(u"\",") - 2) / sizeof(char16_t));
 			}
 			res.append(u"]},", (sizeof(u"]},") - 2) / sizeof(char16_t));
 		}
+
 		if (bGlobal) {
+			/*options = 0;
+			if (start_offset == ovector[1]) {
+				//break;
+				if (ovector[0] == paParams[0].wstrLen) break;
+				options = PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED;
+			}/*
 			start_offset = ovector[1];
 			/*if (crlf_is_newline &&                      // If CRLF is newline & 
 				start_offset < paParams[0].wstrLen - 1 &&    // we are at CRLF, 
@@ -960,8 +1069,6 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 
 	res += u']'; // array
 
-	uiSubMatchesCount = rc - 1;
-
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
 		memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(char16_t));
@@ -973,7 +1080,6 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	m_PropCountOfItemsInSearchResult = 0;
 	if (bClearPattern && pattern != NULL) {
 		pcre2_code_free(pattern);
-		delete pattern;
 	}
 	return true;
 }
@@ -1031,7 +1137,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 				NULL,
 				(PCRE2_SPTR16)paParams[2].pwstrVal,
 				paParams[2].wstrLen, (PCRE2_UCHAR *)pvarRetValue->pwstrVal, &outlength); 
-			if (rc > 0) 
+			if (rc >= 0) 
 				pvarRetValue->wstrLen = outlength;
 			else
 				pvarRetValue->wstrLen = 0;
@@ -1048,7 +1154,6 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	mSubMatches.clear();
 	if (bClearPattern && pattern != NULL) {
 		pcre2_code_free(pattern);
-		delete pattern;
 	}
 
 	/*SetLastError("");
@@ -1190,7 +1295,6 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 		mSubMatches.clear();
 		if (bClearPattern && pattern != NULL) {
 			pcre2_code_free(pattern);
-			delete pattern;
 		}
 		return true;
 }
@@ -1289,13 +1393,15 @@ void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const lon
 
 pcre2_code*  CAddInNative::GetPattern(const char16_t* patternStr, const long len) {
 
+	SetLastError(u"");
+
 	int errornumber;
 	PCRE2_SIZE erroroffset = NULL;
 	pcre2_code* res;
 
 	res = pcre2_compile((PCRE2_SPTR16)patternStr,               // the pattern 
 		len, // indicates pattern is zero-terminated 
-		PCRE2_UTF|(bIgnoreCase ? PCRE2_CASELESS : 0), // options 
+		PCRE2_UTF|(bIgnoreCase ? PCRE2_CASELESS : 0)|(bMultiline ? PCRE2_MULTILINE : 0), // options 
 		&errornumber,          // for error number 
 		&erroroffset,          // for error offset 
 		NULL);
