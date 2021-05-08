@@ -248,7 +248,7 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (sErrorDescription.length() + 1) * sizeof(char16_t)))
 		{
 			memcpy(pvarPropVal->pwstrVal, sErrorDescription.c_str(), (sErrorDescription.length() + 1) * sizeof(char16_t));
-			TV_VT(pvarPropVal) = VTYPE_PSTR;
+			TV_VT(pvarPropVal) = VTYPE_PWSTR;
 			pvarPropVal->wstrLen = sErrorDescription.length();
 			return true;
 		}
@@ -1088,6 +1088,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 {
 	SetLastError(u"");
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
+	pvarRetValue->wstrLen = 0;
 	
 	pcre2_code* pattern = NULL;
 	bool bClearPattern = false;
@@ -1105,6 +1106,15 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
 	}
 
+	if (pattern == NULL)
+	{
+		SetLastError(u"The regexp template is not specified.");
+		if (bThrowExceptions)
+			return false;
+		else
+			return true;
+	}
+
 	PCRE2_SIZE start_offset = 0;
 	size_t rootIndex = 0;
 	int rc;
@@ -1113,12 +1123,13 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 
 	PCRE2_UCHAR outputbuffer;
 	PCRE2_SIZE outlength = 0;
+	bool isError = false;
 
 	rc = pcre2_substitute(pattern, 
 		(PCRE2_SPTR16)paParams[0].pwstrVal, 
 		paParams[0].wstrLen,
 		0,
-		bGlobal?PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_EXTENDED : PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_EXTENDED,
+		bGlobal?PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_EXTENDED : PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_EXTENDED,
 		match_data,
 		NULL,
 		(PCRE2_SPTR16)paParams[2].pwstrVal, 
@@ -1132,19 +1143,33 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 				(PCRE2_SPTR16)paParams[0].pwstrVal,
 				paParams[0].wstrLen,
 				0,
-				bGlobal ? PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_EXTENDED : PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_EXTENDED,
+				bGlobal ? PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_EXTENDED : PCRE2_SUBSTITUTE_OVERFLOW_LENGTH | PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_EXTENDED,
 				match_data,
 				NULL,
 				(PCRE2_SPTR16)paParams[2].pwstrVal,
-				paParams[2].wstrLen, (PCRE2_UCHAR *)pvarRetValue->pwstrVal, &outlength); 
-			if (rc >= 0) 
+				paParams[2].wstrLen, (PCRE2_UCHAR *)pvarRetValue->pwstrVal, &outlength);
+			if (rc >= 0)
 				pvarRetValue->wstrLen = outlength;
-			else
+			else {
+				PCRE2_UCHAR buffer[256];
+				pcre2_get_error_message_16(rc, buffer, sizeof(buffer));
+				SetLastError((const char16_t*)buffer);
 				pvarRetValue->wstrLen = 0;
+				isError = true;
+			}
+
 		}
 	}
 	else
+	{
+		if (rc < 0) {
+			PCRE2_UCHAR buffer[256];
+			pcre2_get_error_message_16(rc, buffer, sizeof(buffer));
+			SetLastError((const char16_t*)buffer);
+			isError = true;
+		}
 		pvarRetValue->wstrLen = 0;
+	}
 
 	pcre2_match_data_free(match_data);
 
@@ -1156,85 +1181,8 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		pcre2_code_free(pattern);
 	}
 
-	/*SetLastError("");
-	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	iCurrentPosition = 0;
-	m_PropCountOfItemsInSearchResult = 0;
-	vResults.clear();
-	mSubMatches.clear();
-
-	boost::wregex* pattern = NULL;
-	bool bClearPattern = false;
-
-	std::wstring str;
-	GetStrParam(str, paParams, 0);
-
-	std::wstring res;
-	try
-	{
-		if (paParams[1].wstrLen == 0)
-		{
-			if (isPattern)
-				pattern = &rePattern;
-			else
-				return true;
-		}
-		else
-		{
-			bClearPattern = true;
-			pattern = GetPattern(paParams, 1);
-		}
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-
-		std::wstring replacement;
-		GetStrParam(replacement, paParams, 2);
-		if (bGlobal)
-			res = boost::regex_replace(str, *pattern, replacement);
-		else
-			res = boost::regex_replace(str, *pattern, replacement, boost::regex_constants::format_first_only);
-#else
-		if (bGlobal)
-			res = boost::regex_replace(str, *pattern, paParams[2].pwstrVal);
-		else
-			res = boost::regex_replace(str, *pattern, paParams[2].pwstrVal, boost::regex_constants::format_first_only);
-
-#endif
-	}
-	catch (const std::exception& e)
-	{
-		vResults.clear();
-		mSubMatches.clear();
-		iCurrentPosition = -1;
-		uiSubMatchesCount = 0;
-		m_PropCountOfItemsInSearchResult = 0;
-		if (bClearPattern && pattern != NULL)
-			delete pattern;
-		SetLastError(e.what());
-		if (bThrowExceptions)
-			return false;
-		else
-			return true;
-	}
-
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-
-	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char32_t)))
-	{
-		convertUTF32ToUTF16(res.c_str(), res.length(), (char16_t *)pvarRetValue->pwstrVal);
-		pvarRetValue->wstrLen = res.length();
-		return true;
-	}
-#else
-	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(wchar_t)))
-	{
-		memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(wchar_t));
-		pvarRetValue->wstrLen = res.length();
-		return true;
-	}
-#endif
-
-	if (bClearPattern && pattern != NULL)
-		delete pattern;*/
+	if (isError && bThrowExceptions)
+		return false;
 
 	return true;
 }
@@ -1354,7 +1302,7 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"13.3";
+	std::basic_string<char16_t> res = u"13.5";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{

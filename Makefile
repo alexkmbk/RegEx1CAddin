@@ -4,7 +4,7 @@ else
 CPU = 64
 endif
 
-SOURCES=AddInNative.cpp StrConv.cpp 
+SOURCES=AddInNative.cpp StrConv.cpp json.cpp
 
 ifeq ($(macos),1)
 TARGETDIR = "$(CURDIR)/macos/"
