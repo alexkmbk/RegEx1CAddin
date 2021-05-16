@@ -76,7 +76,7 @@ CAddInNative::CAddInNative()
 	sErrorDescription = u"";
 	bThrowExceptions = false;
 	bIgnoreCase = false;
-	bMultiline = false;
+	bMultiline = true;
 	isPattern = false;
 	bGlobal = false;
 	bHierarchicalResultIteration = false;
@@ -692,6 +692,11 @@ bool CAddInNative::search(tVariant * paParams)
 	iCurrentPosition = -1;
 	uiSubMatchesCount = 0;
 
+	if (paParams[0].wstrLen == 0)
+	{
+		return true;
+	}
+
 	pcre2_code* pattern = NULL;
 	bool bClearPattern = false;
 
@@ -759,7 +764,7 @@ bool CAddInNative::search(tVariant * paParams)
 			}
 		}
 
-		if (start_offset >= subject_length)
+		if (start_offset > subject_length)
 			break;
 		rc = pcre2_match(
 			pattern,                   /* the compiled pattern */
@@ -790,7 +795,9 @@ bool CAddInNative::search(tVariant * paParams)
 
 		if (rc < 0)
 		{
-			SetLastError(u"Matching error");
+			PCRE2_UCHAR buffer[256];
+			pcre2_get_error_message_16(rc, buffer, sizeof(buffer));
+			SetLastError((const char16_t*)buffer);
 			pcre2_match_data_free(match_data);   /* Release memory used for the match */
 			if (bThrowExceptions)
 				return false;
@@ -859,10 +866,24 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	mSubMatches.clear();
 	iCurrentPosition = -1;
 	uiSubMatchesCount = 0;
-	
-	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 
 	std::basic_string<char16_t> res;
+
+	TV_VT(pvarRetValue) = VTYPE_PWSTR;
+
+	if (paParams[0].wstrLen == 0)
+	{
+		m_PropCountOfItemsInSearchResult = 0;
+
+		res = u"[]";
+		if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
+		{
+			memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(char16_t));
+			pvarRetValue->wstrLen = res.length();
+		}
+		return true;
+	}
+
 	res.reserve(paParams[0].wstrLen); // мы не знаем сколько памяти потребуется, поэтому выделим тот объем, который занимает исходный текст
 
 	pcre2_code* pattern = NULL;
@@ -934,7 +955,7 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 			}
 		}
 
-		if (start_offset >= subject_length)
+		if (start_offset > subject_length)
 			break;
 		rc = pcre2_match(
 			pattern,                   /* the compiled pattern */
@@ -965,7 +986,9 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 
 		if (rc < 0)
 		{
-			SetLastError(u"Matching error");
+			PCRE2_UCHAR buffer[256];
+			pcre2_get_error_message_16(rc, buffer, sizeof(buffer));
+			SetLastError((const char16_t*)buffer);
 			pcre2_match_data_free(match_data);   /* Release memory used for the match */
 			if (bThrowExceptions)
 				return false;
@@ -1090,6 +1113,12 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 	pvarRetValue->wstrLen = 0;
 	
+	if (paParams[0].wstrLen == 0)
+	{
+		pvarRetValue->wstrLen = 0;
+		return true;
+	}
+
 	pcre2_code* pattern = NULL;
 	bool bClearPattern = false;
 
@@ -1191,6 +1220,12 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 {
 	SetLastError(u"");
 	TV_VT(pvarRetValue) = VTYPE_BOOL;
+
+	if (paParams[0].wstrLen == 0)
+	{
+		pvarRetValue->bVal = false;
+		return true;
+	}
 
 	pcre2_code* pattern = NULL;
 	bool bClearPattern = false;
@@ -1302,7 +1337,7 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"13.5";
+	std::basic_string<char16_t> res = u"13.7";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
