@@ -5,6 +5,8 @@
 
 cmake_minimum_required(VERSION 3.4.1)
 
+#add_definitions(-D__ANDROID__)
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp)
 #include_directories(${PROJECT_SOURCE_DIR}../../../)
@@ -24,7 +26,7 @@ add_library( # Sets the name of the library.
              SHARED
 
              # Provides a relative path to your source file(s).
-             src/main/cpp/jnienv.cpp ${PROJECT_SOURCE_DIR}../../../StrConv.cpp ${PROJECT_SOURCE_DIR}../../../AddInNative.cpp)
+             src/main/cpp/jnienv.cpp ${PROJECT_SOURCE_DIR}../../../json.cpp ${PROJECT_SOURCE_DIR}../../../StrConv.cpp ${PROJECT_SOURCE_DIR}../../../AddInNative.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -42,8 +44,8 @@ find_library( # Sets the name of the path variable.
 #${CMAKE_CURRENT_SOURCE_DIR} - the path to the CMakeLists.txt file
 
 target_link_libraries(AddInNative -L${CMAKE_CURRENT_SOURCE_DIR}/libs/android/)
-target_link_libraries(AddInNative -lpcre2-16)
-#target_link_libraries(AddInNative -lpcre2-16_x86_64)
+#target_link_libraries(AddInNative -lpcre2-16)
+target_link_libraries(AddInNative -lpcre2-16_x86_64)
 
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this

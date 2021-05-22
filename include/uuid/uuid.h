@@ -100,6 +100,8 @@ struct uuid_st {
 
 #if !defined(__APPLE__)
 typedef struct uuid_st uuid_t;
+#else 
+typedef __darwin_uuid_t	uuid_t;
 #endif
 
 /* UUID object handling */

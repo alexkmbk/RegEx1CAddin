@@ -13,6 +13,7 @@
 
 #include <vector>
 #include <map>
+#include <locale.h>
 
 #include "StrConv.h"
 #include "json.h"
