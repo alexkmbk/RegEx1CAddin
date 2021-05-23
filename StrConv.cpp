@@ -80,3 +80,39 @@ inline void tolowerPtr(char16_t *p)
 		*p = u'ё';
 }
 
+void strrev_u16(char16_t *str, int len)
+{
+	int i;
+	int j;
+	char16_t a;
+	for (i = 0, j = len - 1; i < j; i++, j--)
+	{
+		a = str[i];
+		str[i] = str[j];
+		str[j] = a;
+	}
+}
+
+int itoa_u16(int num, char16_t* str, int len, int base)
+{
+	int sum = num;
+	int i = 0;
+	int digit;
+	if (len == 0)
+		return -1;
+	do
+	{
+		digit = sum % base;
+		if (digit < 0xA)
+			str[i++] = u'0' + digit;
+		else
+			str[i++] = u'A' + digit - 0xA;
+		sum /= base;
+	} while (sum && (i < (len - 1)));
+	if (i == (len - 1) && sum)
+		return -1;
+	str[i] = '\0';
+	strrev_u16(str, i);
+	return i;
+}
+

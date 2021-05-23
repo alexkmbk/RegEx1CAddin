@@ -33,6 +33,8 @@ CMakeTemp/
 macos/
 tests/
 lib/webbrowsers/
+Android/Package/
+
 MacBuild/
 Package/
 # Visual Studio 2015 cache/options directory
@@ -279,3 +281,5 @@ __pycache__/
 /stdafx.d
 /stdafx.o
 /lib/linux.zip
+/build_pcre2.sh
+/pcre2-10.36_linux

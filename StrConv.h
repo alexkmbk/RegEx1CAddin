@@ -11,3 +11,6 @@ unsigned int convertUTF32ToUTF16(const wchar_t *input, size_t input_size, char16
 //
 void tolowerStr(std::basic_string<char16_t> & s);
 
+// Преобразование числа в строку  char16_t
+//
+int itoa_u16(int num, char16_t* str, int len, int base);
