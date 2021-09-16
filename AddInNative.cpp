@@ -331,8 +331,7 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 			pcre2_code_free(rePattern);
 
 		sPattern.clear();
-
-		rePattern = GetPattern((char16_t*)varPropVal->pwstrVal, varPropVal->wstrLen);
+		rePattern = GetPattern(varPropVal);
 		if (rePattern == NULL)
 		{
 			isPattern = false;
@@ -622,8 +621,7 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 	case eMethIsMatch:
 	case eMethTest:
 	{
-		match(pvarRetValue, paParams);
-		return true;
+		return match(pvarRetValue, paParams);
 	}
 	break;
 	case eMethReplace:
@@ -697,6 +695,15 @@ bool CAddInNative::search(tVariant * paParams)
 		return true;
 	}
 
+	if (paParams[0].vt != VTYPE_PWSTR)
+	{
+		SetLastError(u"Only values of string type can be passed for search text");
+		if (bThrowExceptions)
+			return false;
+		else
+			return true;
+	}
+
 	pcre2_code* pattern = NULL;
 	bool bClearPattern = false;
 
@@ -710,7 +717,7 @@ bool CAddInNative::search(tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
+		pattern = GetPattern(&paParams[1]);
 	}
 
 	if (pattern == NULL)
@@ -867,6 +874,15 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	iCurrentPosition = -1;
 	uiSubMatchesCount = 0;
 
+	if (paParams[0].vt != VTYPE_PWSTR)
+	{
+		SetLastError(u"Only values of string type can be passed for search text");
+		if (bThrowExceptions)
+			return false;
+		else
+			return true;
+	}
+
 	std::basic_string<char16_t> res;
 
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
@@ -899,7 +915,7 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
+		pattern = GetPattern(&paParams[1]);
 	}
 
 	if (pattern == NULL)
@@ -1113,6 +1129,16 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 	pvarRetValue->wstrLen = 0;
 	
+	if (paParams[0].vt != VTYPE_PWSTR)
+	{
+		SetLastError(u"Only values of string type can be passed for search text");
+		if (bThrowExceptions)
+			return false;
+		else
+			return true;
+	}
+
+
 	if (paParams[0].wstrLen == 0)
 	{
 		pvarRetValue->wstrLen = 0;
@@ -1132,7 +1158,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
+		pattern = GetPattern(&paParams[1]);
 	}
 
 	if (pattern == NULL)
@@ -1221,6 +1247,18 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 	SetLastError(u"");
 	TV_VT(pvarRetValue) = VTYPE_BOOL;
 
+	if (paParams[0].vt != VTYPE_PWSTR)
+	{
+		SetLastError(u"Only values of string type can be passed for search text");
+		if (bThrowExceptions)
+		{
+			return false;
+		}
+		else
+			return true;
+	}
+
+
 	if (paParams[0].wstrLen == 0)
 	{
 		pvarRetValue->bVal = false;
@@ -1238,7 +1276,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
+		pattern = GetPattern(&paParams[1]);
 	}
 
 	if (pattern == NULL)
@@ -1337,7 +1375,7 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"13.7";
+	std::basic_string<char16_t> res = u"14.0";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
@@ -1357,7 +1395,7 @@ void CAddInNative::version(tVariant * pvarRetValue)
 //
 void CAddInNative::SetLastError(const char16_t* error) {
 
-	if (error == 0) {
+	if (error == 0 || error[0] == 0) {
 		sErrorDescription.clear();
 		return;
 	}
@@ -1374,9 +1412,18 @@ void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const lon
 #endif
 }
 
-pcre2_code*  CAddInNative::GetPattern(const char16_t* patternStr, const long len) {
+pcre2_code*  CAddInNative::GetPattern(const tVariant *tvPattern) {
 
 	SetLastError(u"");
+
+	char16_t* patternStr = (char16_t*)tvPattern->pwstrVal;
+	const long len = tvPattern->wstrLen;
+
+	if (tvPattern->vt != VTYPE_PWSTR)
+	{
+		SetLastError(u"Only values of string type can be passed as a template");
+		return NULL;
+	}
 
 	int errornumber;
 	PCRE2_SIZE erroroffset = NULL;
