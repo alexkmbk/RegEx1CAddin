@@ -39,6 +39,7 @@ public:
 		ePropGlobal,
 		ePropFirstIndex,
 		ePropMultiline,
+		ePropUCP,
         ePropLast      // Always last
     };
 
@@ -112,6 +113,7 @@ private:
 	bool bThrowExceptions;
 	bool bIgnoreCase;
 	bool bMultiline;
+	bool bUCP;
 	pcre2_code* rePattern;
 	std::basic_string<char16_t> sPattern;
 

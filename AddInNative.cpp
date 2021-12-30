@@ -77,6 +77,7 @@ CAddInNative::CAddInNative()
 	bThrowExceptions = false;
 	bIgnoreCase = false;
 	bMultiline = true;
+	bUCP = false;
 	isPattern = false;
 	bGlobal = false;
 	bHierarchicalResultIteration = false;
@@ -95,12 +96,12 @@ CAddInNative::CAddInNative()
 	}
 
 	if (mProps.size() == 0) {
-		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global", u"FirstIndex", u"Multiline"};
+		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global", u"FirstIndex", u"Multiline", u"UCP"};
 		fillMap(mProps, vProps);
 	}
 
 	if (mProps_ru.size() == 0) {
-		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения", u"FirstIndex", u"Многострочный"};
+		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения", u"FirstIndex", u"Многострочный", u"UCP"};
 		fillMap(mProps_ru, vProps_ru);
 	}
 }
@@ -289,6 +290,12 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 		pvarPropVal->bVal = bMultiline;
 		return true;
 	}
+	case ePropUCP:
+	{
+		TV_VT(pvarPropVal) = VTYPE_BOOL;
+		pvarPropVal->bVal = bUCP;
+		return true;
+	}
 	case ePropGlobal:
 	{
 		TV_VT(pvarPropVal) = VTYPE_BOOL;
@@ -355,6 +362,11 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 		bMultiline = TV_BOOL(varPropVal);
 		return true;
 	}
+	case ePropUCP:
+	{
+		bUCP = TV_BOOL(varPropVal);
+		return true;
+	}
 	default:
 		return false;
 	}
@@ -382,6 +394,8 @@ bool CAddInNative::IsPropReadable(const long lPropNum)
 		return true;
 	case ePropMultiline:
 		return true;
+	case ePropUCP:
+		return true;
 	default:
 		return false;
 	}
@@ -402,6 +416,8 @@ bool CAddInNative::IsPropWritable(const long lPropNum)
 	case ePropGlobal:
 		return true;
 	case ePropMultiline:
+		return true;
+	case ePropUCP:
 		return true;
 	default:
 		return false;
@@ -1351,7 +1367,7 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"14.0";
+	std::basic_string<char16_t> res = u"14.2";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
@@ -1407,7 +1423,7 @@ pcre2_code*  CAddInNative::GetPattern(const tVariant *tvPattern) {
 
 	res = pcre2_compile((PCRE2_SPTR16)patternStr,               // the pattern 
 		len, // indicates pattern is zero-terminated 
-		PCRE2_UTF|(bIgnoreCase ? PCRE2_CASELESS : 0)|(bMultiline ? PCRE2_MULTILINE : 0), // options 
+		PCRE2_UTF|(bIgnoreCase ? PCRE2_CASELESS : 0)|(bMultiline ? PCRE2_MULTILINE : 0)|(bUCP? PCRE2_UCP : 0), // options 
 		&errornumber,          // for error number 
 		&erroroffset,          // for error offset 
 		NULL);
