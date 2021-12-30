@@ -77,6 +77,7 @@ CAddInNative::CAddInNative()
 	bThrowExceptions = false;
 	bIgnoreCase = false;
 	bMultiline = true;
+	bUCP = false;
 	isPattern = false;
 	bGlobal = false;
 	bHierarchicalResultIteration = false;
@@ -95,12 +96,12 @@ CAddInNative::CAddInNative()
 	}
 
 	if (mProps.size() == 0) {
-		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global", u"FirstIndex", u"Multiline"};
+		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global", u"FirstIndex", u"Multiline", u"UCP"};
 		fillMap(mProps, vProps);
 	}
 
 	if (mProps_ru.size() == 0) {
-		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения", u"FirstIndex", u"Многострочный"};
+		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения", u"FirstIndex", u"Многострочный", u"UCP"};
 		fillMap(mProps_ru, vProps_ru);
 	}
 }
@@ -289,6 +290,12 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 		pvarPropVal->bVal = bMultiline;
 		return true;
 	}
+	case ePropUCP:
+	{
+		TV_VT(pvarPropVal) = VTYPE_BOOL;
+		pvarPropVal->bVal = bUCP;
+		return true;
+	}
 	case ePropGlobal:
 	{
 		TV_VT(pvarPropVal) = VTYPE_BOOL;
@@ -331,8 +338,7 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 			pcre2_code_free(rePattern);
 
 		sPattern.clear();
-
-		rePattern = GetPattern((char16_t*)varPropVal->pwstrVal, varPropVal->wstrLen);
+		rePattern = GetPattern(varPropVal);
 		if (rePattern == NULL)
 		{
 			isPattern = false;
@@ -354,6 +360,11 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 	case ePropMultiline:
 	{
 		bMultiline = TV_BOOL(varPropVal);
+		return true;
+	}
+	case ePropUCP:
+	{
+		bUCP = TV_BOOL(varPropVal);
 		return true;
 	}
 	default:
@@ -383,6 +394,8 @@ bool CAddInNative::IsPropReadable(const long lPropNum)
 		return true;
 	case ePropMultiline:
 		return true;
+	case ePropUCP:
+		return true;
 	default:
 		return false;
 	}
@@ -403,6 +416,8 @@ bool CAddInNative::IsPropWritable(const long lPropNum)
 	case ePropGlobal:
 		return true;
 	case ePropMultiline:
+		return true;
+	case ePropUCP:
 		return true;
 	default:
 		return false;
@@ -622,8 +637,7 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 	case eMethIsMatch:
 	case eMethTest:
 	{
-		match(pvarRetValue, paParams);
-		return true;
+		return match(pvarRetValue, paParams);
 	}
 	break;
 	case eMethReplace:
@@ -691,10 +705,20 @@ bool CAddInNative::search(tVariant * paParams)
 	mSubMatches.clear();
 	iCurrentPosition = -1;
 	uiSubMatchesCount = 0;
+	m_PropCountOfItemsInSearchResult = 0;
 
 	if (paParams[0].wstrLen == 0)
 	{
 		return true;
+	}
+
+	if (paParams[0].vt != VTYPE_PWSTR)
+	{
+		SetLastError(u"Only values of string type can be passed for search text");
+		if (bThrowExceptions)
+			return false;
+		else
+			return true;
 	}
 
 	pcre2_code* pattern = NULL;
@@ -710,7 +734,7 @@ bool CAddInNative::search(tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
+		pattern = GetPattern(&paParams[1]);
 	}
 
 	if (pattern == NULL)
@@ -866,6 +890,16 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	mSubMatches.clear();
 	iCurrentPosition = -1;
 	uiSubMatchesCount = 0;
+	m_PropCountOfItemsInSearchResult = 0;
+
+	if (paParams[0].vt != VTYPE_PWSTR)
+	{
+		SetLastError(u"Only values of string type can be passed for search text");
+		if (bThrowExceptions)
+			return false;
+		else
+			return true;
+	}
 
 	std::basic_string<char16_t> res;
 
@@ -873,8 +907,6 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 
 	if (paParams[0].wstrLen == 0)
 	{
-		m_PropCountOfItemsInSearchResult = 0;
-
 		res = u"[]";
 		if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 		{
@@ -899,7 +931,7 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
+		pattern = GetPattern(&paParams[1]);
 	}
 
 	if (pattern == NULL)
@@ -1064,30 +1096,8 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 			res.append(u"]},", (sizeof(u"]},") - 2) / sizeof(char16_t));
 		}
 
-		if (bGlobal) {
-			/*options = 0;
-			if (start_offset == ovector[1]) {
-				//break;
-				if (ovector[0] == paParams[0].wstrLen) break;
-				options = PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED;
-			}/*
-			start_offset = ovector[1];
-			/*if (crlf_is_newline &&                      // If CRLF is newline & 
-				start_offset < paParams[0].wstrLen - 1 &&    // we are at CRLF, 
-				paParams[0].pwstrVal[start_offset] == u'\r' &&
-				paParams[0].pwstrVal[start_offset + 1] == u'\n'){ 
-				start_offset += 2;
-			}
-			else if (crlf_is_newline &&                      // If CRLF is newline & 
-				start_offset < paParams[0].wstrLen - 1 &&
-				start_offset > 0 &&
-				paParams[0].pwstrVal[start_offset - 1] == u'\r' && // we are at CRLF, 
-				paParams[0].pwstrVal[start_offset] == u'\n') {
-				start_offset += 1;
-			}*/
-		}
-		else
-			break;
+		if (!bGlobal)
+				break;
 	}
 
 	res += u']'; // array
@@ -1099,8 +1109,6 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	}
 	
 	pcre2_match_data_free(match_data);
-	iCurrentPosition = -1;
-	m_PropCountOfItemsInSearchResult = 0;
 	if (bClearPattern && pattern != NULL) {
 		pcre2_code_free(pattern);
 	}
@@ -1113,6 +1121,16 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 	pvarRetValue->wstrLen = 0;
 	
+	if (paParams[0].vt != VTYPE_PWSTR)
+	{
+		SetLastError(u"Only values of string type can be passed for search text");
+		if (bThrowExceptions)
+			return false;
+		else
+			return true;
+	}
+
+
 	if (paParams[0].wstrLen == 0)
 	{
 		pvarRetValue->wstrLen = 0;
@@ -1132,7 +1150,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
+		pattern = GetPattern(&paParams[1]);
 	}
 
 	if (pattern == NULL)
@@ -1164,7 +1182,7 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 		(PCRE2_SPTR16)paParams[2].pwstrVal, 
 		paParams[2].wstrLen, 0, &outlength);
 
-	if (rc == PCRE2_ERROR_NOMEMORY)
+	if (rc == PCRE2_ERROR_NOMEMORY) // it is not actually an error, it is an anticipated behavior
 	{
 		if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (outlength + 1) * sizeof(WCHAR)))
 		{
@@ -1202,10 +1220,10 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 
 	pcre2_match_data_free(match_data);
 
-	iCurrentPosition = 0;
+	/*iCurrentPosition = 0;
 	m_PropCountOfItemsInSearchResult = 0;
 	vResults.clear();
-	mSubMatches.clear();
+	mSubMatches.clear();*/
 	if (bClearPattern && pattern != NULL) {
 		pcre2_code_free(pattern);
 	}
@@ -1220,10 +1238,22 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 {
 	SetLastError(u"");
 	TV_VT(pvarRetValue) = VTYPE_BOOL;
+	pvarRetValue->bVal = false;
+
+	if (paParams[0].vt != VTYPE_PWSTR)
+	{
+		SetLastError(u"Only values of string type can be passed for search text");
+		if (bThrowExceptions)
+		{
+			return false;
+		}
+		else
+			return true;
+	}
+
 
 	if (paParams[0].wstrLen == 0)
 	{
-		pvarRetValue->bVal = false;
 		return true;
 	}
 
@@ -1238,7 +1268,7 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 	else
 	{
 		bClearPattern = true;
-		pattern = GetPattern((char16_t*)paParams[1].pwstrVal, paParams[1].wstrLen);
+		pattern = GetPattern(&paParams[1]);
 	}
 
 	if (pattern == NULL)
@@ -1272,10 +1302,10 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 
 		pcre2_match_data_free(match_data);
 
-		iCurrentPosition = 0;
+		/*iCurrentPosition = 0;
 		m_PropCountOfItemsInSearchResult = 0;
 		vResults.clear();
-		mSubMatches.clear();
+		mSubMatches.clear();*/
 		if (bClearPattern && pattern != NULL) {
 			pcre2_code_free(pattern);
 		}
@@ -1337,7 +1367,7 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"13.7";
+	std::basic_string<char16_t> res = u"14.2";
 
 	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
 	{
@@ -1357,7 +1387,7 @@ void CAddInNative::version(tVariant * pvarRetValue)
 //
 void CAddInNative::SetLastError(const char16_t* error) {
 
-	if (error == 0) {
+	if (error == 0 || error[0] == 0) {
 		sErrorDescription.clear();
 		return;
 	}
@@ -1374,9 +1404,18 @@ void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const lon
 #endif
 }
 
-pcre2_code*  CAddInNative::GetPattern(const char16_t* patternStr, const long len) {
+pcre2_code*  CAddInNative::GetPattern(const tVariant *tvPattern) {
 
 	SetLastError(u"");
+
+	char16_t* patternStr = (char16_t*)tvPattern->pwstrVal;
+	const long len = tvPattern->wstrLen;
+
+	if (tvPattern->vt != VTYPE_PWSTR)
+	{
+		SetLastError(u"Only values of string type can be passed as a template");
+		return NULL;
+	}
 
 	int errornumber;
 	PCRE2_SIZE erroroffset = NULL;
@@ -1384,7 +1423,7 @@ pcre2_code*  CAddInNative::GetPattern(const char16_t* patternStr, const long len
 
 	res = pcre2_compile((PCRE2_SPTR16)patternStr,               // the pattern 
 		len, // indicates pattern is zero-terminated 
-		PCRE2_UTF|(bIgnoreCase ? PCRE2_CASELESS : 0)|(bMultiline ? PCRE2_MULTILINE : 0), // options 
+		PCRE2_UTF|(bIgnoreCase ? PCRE2_CASELESS : 0)|(bMultiline ? PCRE2_MULTILINE : 0)|(bUCP? PCRE2_UCP : 0), // options 
 		&errornumber,          // for error number 
 		&erroroffset,          // for error offset 
 		NULL);
@@ -1393,11 +1432,11 @@ pcre2_code*  CAddInNative::GetPattern(const char16_t* patternStr, const long len
 	{
 		PCRE2_UCHAR buffer[256];
 		pcre2_get_error_message_16(errornumber, buffer, sizeof(buffer));
-		vResults.clear();
+		/*vResults.clear();
 		mSubMatches.clear();
 		iCurrentPosition = -1;
 		uiSubMatchesCount = 0;
-		m_PropCountOfItemsInSearchResult = 0;
+		m_PropCountOfItemsInSearchResult = 0;*/
 		SetLastError((const char16_t*)buffer);
 	}
 

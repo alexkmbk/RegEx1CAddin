@@ -39,6 +39,7 @@ public:
 		ePropGlobal,
 		ePropFirstIndex,
 		ePropMultiline,
+		ePropUCP,
         ePropLast      // Always last
     };
 
@@ -98,7 +99,7 @@ private:
 	void SetLastError(const char16_t* error);
 
 	void GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex);
-	pcre2_code* GetPattern(const char16_t* patternStr, const long len);
+	pcre2_code* GetPattern(const tVariant *tvPattern);
 
     // Attributes
     IAddInDefBase      *m_iConnect;
@@ -112,6 +113,7 @@ private:
 	bool bThrowExceptions;
 	bool bIgnoreCase;
 	bool bMultiline;
+	bool bUCP;
 	pcre2_code* rePattern;
 	std::basic_string<char16_t> sPattern;
 
