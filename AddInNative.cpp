@@ -9,7 +9,7 @@
 
 //static const auto g_kClassNames = u"RegEx";
 static const std::u16string sClassName(u"RegEx");
-static const std::u16string sVersion(u"15.8");
+static const std::u16string sVersion(u"15.10");
 
 static const OrderedSet<std::u16string> osMethods = { u"matches", u"ismatch", u"next", u"replace", u"count", u"submatchescount", u"getsubmatch", u"version", u"matchesjson", u"test"};
 static const OrderedSet<std::u16string> osMethods_ru = { u"найтисовпадения", u"совпадает", u"следующий", u"заменить", u"количество", u"количествовложенныхгрупп", u"получитьподгруппу", u"версия", u"найтисовпаденияjson", u"test"};
@@ -17,29 +17,8 @@ static const OrderedSet<std::u16string> osMethods_ru = { u"найтисовпа�
 static const OrderedSet<std::u16string> osProps = { u"currentvalue", u"ignorecase", u"errordescription", u"throwexceptions", u"pattern", u"global", u"firstindex", u"multiline", u"ucp"};
 static const OrderedSet<std::u16string> osProps_ru = { u"текущеезначение", u"игнорироватьрегистр", u"описаниеошибки", u"вызыватьисключения", u"шаблон", u"всесовпадения", u"firstindex", u"многострочный", u"ucp" };
 
-//static const std::map<std::u16string, long> mMethods = { { u"matches", 0}, {u"ismatch", 1}, {u"next", 2}, {u"replace", 3}, {u"count", 4}, {u"submatchescount", 5}, {u"getsubmatch", 6}, {u"version", 7}, {u"matchesjson", 8}, {u"test", 9} };
-//static const std::vector<std::u16string> vMethods = { u"matches", u"ismatch", u"next", u"replace", u"count", u"submatchescount", u"getsubmatch", u"version", u"matchesjson", u"test" };
-//static const std::map<std::u16string, long> mMethods_ru = { {u"найтисовпадения", 0}, {u"совпадает", 1}, {u"следующий", 2}, {u"заменить", 3}, {u"количество", 4}, {u"количествовложенныхгрупп", 5}, {u"получитьподгруппу", 6}, {u"версия", 7}, {u"найтисовпаденияjson", 8}, {u"test", 9} };
-//static const std::vector<std::u16string> vMethods_ru = { u"найтисовпадения", u"совпадает", u"следующий", u"заменить", u"количество", u"количествовложенныхгрупп", u"получитьподгруппу", u"версия", u"найтисовпаденияjson", u"test" };
-
-/*static const std::map<std::u16string, long> mProps = {{u"currentvalue", 0}, {u"ignorecase", 1}, {u"errordescription", 2}, {u"throwexceptions", 3}, {u"pattern", 4}, {u"global", 5}, {u"firstindex", 6}, {u"multiline", 7}, {u"ucp", 8}};
-static const std::vector<std::u16string> vProps = { u"currentvalue", u"ignorecase", u"errordescription", u"throwexceptions", u"pattern", u"global", u"firstindex", u"multiline", u"ucp" };
-static const std::map<std::u16string, long> mProps_ru = { {u"текущеезначение", 0}, {u"игнорироватьрегистр", 1}, {u"описаниеошибки", 2}, {u"вызыватьисключения", 3}, {u"шаблон", 4}, {u"всесовпадения", 5}, {u"firstindex", 6}, {u"многострочный", 7}, {u"ucp", 8} };
-static const std::vector<std::u16string> vProps_ru = { u"текущеезначение", u"игнорироватьрегистр", u"описаниеошибки", u"вызыватьисключения", u"шаблон", u"всесовпадения", u"firstindex", u"многострочный", u"ucp" };
-*/
 
 AppCapabilities g_capabilities = eAppCapabilitiesInvalid;
-/*
-inline void fillMap(std::map<std::u16string, long>& map, const std::vector<std::u16string> & vector) {
-	long index = 0;
-	for (auto &item : vector)
-	{
-		auto lowCasedItem = item;
-		//tolowerStr(lowCasedItem);
-		map.insert({ lowCasedItem, index });
-		index++;
-	}
-}*/
 
 //---------------------------------------------------------------------------//
 long GetClassObject(const WCHAR_T* wsName, IComponentBase** pInterface)
@@ -1227,10 +1206,6 @@ bool CAddInNative::replace(tVariant * pvarRetValue, tVariant * paParams)
 
 	pcre2_match_data_free(match_data);
 
-	/*iCurrentPosition = 0;
-	m_PropCountOfItemsInSearchResult = 0;
-	vResults.clear();
-	mSubMatches.clear();*/
 	if (bClearPattern && pattern != NULL) {
 		pcre2_code_free(pattern);
 	}
@@ -1309,10 +1284,6 @@ bool CAddInNative::match(tVariant * pvarRetValue, tVariant * paParams)
 
 		pcre2_match_data_free(match_data);
 
-		/*iCurrentPosition = 0;
-		m_PropCountOfItemsInSearchResult = 0;
-		vResults.clear();
-		mSubMatches.clear();*/
 		if (bClearPattern && pattern != NULL) {
 			pcre2_code_free(pattern);
 		}
@@ -1401,16 +1372,6 @@ void CAddInNative::SetLastError(const char16_t* error) {
 	else sErrorDescription = error;
 }
 
-/*void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex) {
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
-	str.resize(paParams[paramIndex].wstrLen);
-	convertUTF16ToUTF32((char16_t *)paParams[paramIndex].pwstrVal, paParams[paramIndex].wstrLen, str);
-#else
-	str.assign(paParams[paramIndex].pwstrVal, paParams[paramIndex].wstrLen);
-#endif
-}
-*/
-
 pcre2_code*  CAddInNative::GetPattern(const tVariant *tvPattern) {
 
 	SetLastError(u"");
@@ -1439,11 +1400,6 @@ pcre2_code*  CAddInNative::GetPattern(const tVariant *tvPattern) {
 	{
 		PCRE2_UCHAR buffer[256];
 		pcre2_get_error_message_16(errornumber, buffer, sizeof(buffer));
-		/*vResults.clear();
-		mSubMatches.clear();
-		iCurrentPosition = -1;
-		uiSubMatchesCount = 0;
-		m_PropCountOfItemsInSearchResult = 0;*/
 		SetLastError((const char16_t*)buffer);
 	}
 
