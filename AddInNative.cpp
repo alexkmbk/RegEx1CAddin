@@ -5,29 +5,41 @@
 #include <stdio.h>
 #include <wchar.h>
 #include "AddInNative.h"
+#include "OrderedSet.h"
 
-static std::map<std::u16string, long> mMethods;
-static std::vector<std::u16string> vMethods;
-static std::map<std::u16string, long> mMethods_ru;
-static std::vector<std::u16string> vMethods_ru;
+//static const auto g_kClassNames = u"RegEx";
+static const std::u16string sClassName(u"RegEx");
+static const std::u16string sVersion(u"15.8");
 
-static std::map<std::u16string, long> mProps;
-static std::vector<std::u16string> vProps;
-static std::map<std::u16string, long> mProps_ru;
-static std::vector<std::u16string> vProps_ru;
+static const OrderedSet<std::u16string> osMethods = { u"matches", u"ismatch", u"next", u"replace", u"count", u"submatchescount", u"getsubmatch", u"version", u"matchesjson", u"test"};
+static const OrderedSet<std::u16string> osMethods_ru = { u"найтисовпадения", u"совпадает", u"следующий", u"заменить", u"количество", u"количествовложенныхгрупп", u"получитьподгруппу", u"версия", u"найтисовпаденияjson", u"test"};
 
-static AppCapabilities g_capabilities = eAppCapabilitiesInvalid;
+static const OrderedSet<std::u16string> osProps = { u"currentvalue", u"ignorecase", u"errordescription", u"throwexceptions", u"pattern", u"global", u"firstindex", u"multiline", u"ucp"};
+static const OrderedSet<std::u16string> osProps_ru = { u"текущеезначение", u"игнорироватьрегистр", u"описаниеошибки", u"вызыватьисключения", u"шаблон", u"всесовпадения", u"firstindex", u"многострочный", u"ucp" };
 
+//static const std::map<std::u16string, long> mMethods = { { u"matches", 0}, {u"ismatch", 1}, {u"next", 2}, {u"replace", 3}, {u"count", 4}, {u"submatchescount", 5}, {u"getsubmatch", 6}, {u"version", 7}, {u"matchesjson", 8}, {u"test", 9} };
+//static const std::vector<std::u16string> vMethods = { u"matches", u"ismatch", u"next", u"replace", u"count", u"submatchescount", u"getsubmatch", u"version", u"matchesjson", u"test" };
+//static const std::map<std::u16string, long> mMethods_ru = { {u"найтисовпадения", 0}, {u"совпадает", 1}, {u"следующий", 2}, {u"заменить", 3}, {u"количество", 4}, {u"количествовложенныхгрупп", 5}, {u"получитьподгруппу", 6}, {u"версия", 7}, {u"найтисовпаденияjson", 8}, {u"test", 9} };
+//static const std::vector<std::u16string> vMethods_ru = { u"найтисовпадения", u"совпадает", u"следующий", u"заменить", u"количество", u"количествовложенныхгрупп", u"получитьподгруппу", u"версия", u"найтисовпаденияjson", u"test" };
+
+/*static const std::map<std::u16string, long> mProps = {{u"currentvalue", 0}, {u"ignorecase", 1}, {u"errordescription", 2}, {u"throwexceptions", 3}, {u"pattern", 4}, {u"global", 5}, {u"firstindex", 6}, {u"multiline", 7}, {u"ucp", 8}};
+static const std::vector<std::u16string> vProps = { u"currentvalue", u"ignorecase", u"errordescription", u"throwexceptions", u"pattern", u"global", u"firstindex", u"multiline", u"ucp" };
+static const std::map<std::u16string, long> mProps_ru = { {u"текущеезначение", 0}, {u"игнорироватьрегистр", 1}, {u"описаниеошибки", 2}, {u"вызыватьисключения", 3}, {u"шаблон", 4}, {u"всесовпадения", 5}, {u"firstindex", 6}, {u"многострочный", 7}, {u"ucp", 8} };
+static const std::vector<std::u16string> vProps_ru = { u"текущеезначение", u"игнорироватьрегистр", u"описаниеошибки", u"вызыватьисключения", u"шаблон", u"всесовпадения", u"firstindex", u"многострочный", u"ucp" };
+*/
+
+AppCapabilities g_capabilities = eAppCapabilitiesInvalid;
+/*
 inline void fillMap(std::map<std::u16string, long>& map, const std::vector<std::u16string> & vector) {
 	long index = 0;
 	for (auto &item : vector)
 	{
 		auto lowCasedItem = item;
-		tolowerStr(lowCasedItem);
+		//tolowerStr(lowCasedItem);
 		map.insert({ lowCasedItem, index });
 		index++;
 	}
-}
+}*/
 
 //---------------------------------------------------------------------------//
 long GetClassObject(const WCHAR_T* wsName, IComponentBase** pInterface)
@@ -58,8 +70,7 @@ long DestroyObject(IComponentBase** pIntf)
 //---------------------------------------------------------------------------//
 const WCHAR_T* GetClassNames()
 {
-	static char16_t cls_names[] = u"RegEx";
-	return reinterpret_cast<WCHAR_T *>(cls_names);
+	return (WCHAR_T*)sClassName.c_str();
 }
 //---------------------------------------------------------------------------//
 
@@ -84,26 +95,6 @@ CAddInNative::CAddInNative()
 	rePattern = NULL;
 
 	sPattern.clear();
-
-	if (mMethods.size() == 0) {
-		vMethods = { u"Matches", u"IsMatch", u"Next", u"Replace", u"Count", u"SubMatchesCount", u"GetSubMatch", u"Version", u"MatchesJSON", u"Test" };
-		fillMap(mMethods, vMethods);
-	}
-
-	if (mMethods_ru.size() == 0) {
-		vMethods_ru = { u"НайтиСовпадения", u"Совпадает", u"Следующий", u"Заменить", u"Количество", u"КоличествоВложенныхГрупп", u"ПолучитьПодгруппу", u"Версия", u"НайтиСовпаденияJSON", u"Test" };
-		fillMap(mMethods_ru, vMethods_ru);
-	}
-
-	if (mProps.size() == 0) {
-		vProps = { u"CurrentValue", u"IgnoreCase", u"ErrorDescription", u"ThrowExceptions", u"Pattern", u"Global", u"FirstIndex", u"Multiline", u"UCP"};
-		fillMap(mProps, vProps);
-	}
-
-	if (mProps_ru.size() == 0) {
-		vProps_ru = { u"ТекущееЗначение", u"ИгнорироватьРегистр", u"ОписаниеОшибки", u"ВызыватьИсключения", u"Шаблон", u"ВсеСовпадения", u"FirstIndex", u"Многострочный", u"UCP"};
-		fillMap(mProps_ru, vProps_ru);
-	}
 }
 //---------------------------------------------------------------------------//
 CAddInNative::~CAddInNative()
@@ -134,13 +125,16 @@ void CAddInNative::Done()
 //---------------------------------------------------------------------------//
 bool CAddInNative::RegisterExtensionAs(WCHAR_T** wsExtensionName)
 {
-	char16_t name[] = u"RegEx";
+	if (wsExtensionName == nullptr) {
+		return false;
+	}
+	const size_t size = (sClassName.size() + 1) * sizeof(char16_t);
 
-	if (!m_iMemory || !m_iMemory->AllocMemory(reinterpret_cast<void **>(wsExtensionName), sizeof(name))) {
+	if (!m_iMemory || !m_iMemory->AllocMemory(reinterpret_cast<void **>(wsExtensionName), size) || *wsExtensionName ==  nullptr) {
 		return false;
 	};
 
-	memcpy(*wsExtensionName, name, sizeof(name));
+	memcpy(*wsExtensionName, sClassName.c_str(), size);
 
 	return true;
 }
@@ -155,12 +149,12 @@ long CAddInNative::FindProp(const WCHAR_T* wsPropName)
 	std::basic_string<char16_t> usPropName = (char16_t*)(wsPropName);
 	tolowerStr(usPropName);
 
-	auto it = mProps.find(usPropName);
-	if (it != mProps.end())
+	auto it = osProps.getByKey(usPropName);
+	if (it != osProps.end())
 		return it->second;
 
-	it = mProps_ru.find(usPropName);
-	if (it != mProps_ru.end())
+	it = osProps_ru.getByKey(usPropName);
+	if (it != osProps_ru.end())
 		return it->second;
 
 	return -1;
@@ -172,27 +166,27 @@ const WCHAR_T* CAddInNative::GetPropName(long lPropNum, long lPropAlias)
 	if (lPropNum >= ePropLast)
 		return NULL;
 
-	std::basic_string<char16_t> *usCurrentName;
+	const std::basic_string<char16_t> *usCurrentName;
 
 	switch (lPropAlias)
 	{
 	case 0: // First language
-		usCurrentName = &vProps[lPropNum];
+		usCurrentName = &osProps.getKeyByIndex(lPropNum);
 		break;
 	case 1: // Second language
-		usCurrentName = &vProps_ru[lPropNum];
+		usCurrentName = &osProps_ru.getKeyByIndex(lPropNum);
 		break;
 	default:
 		return 0;
 	}
 
-	if (usCurrentName->length() == 0) {
+	if (usCurrentName == nullptr || usCurrentName->length() == 0) {
 		return nullptr;
 	}
 
 	WCHAR_T *result = nullptr;
 
-	size_t bytes = (usCurrentName->length() + 1) * sizeof(char16_t);
+	const size_t bytes = (usCurrentName->length() + 1) * sizeof(char16_t);
 
 	if (!m_iMemory || !m_iMemory->AllocMemory(reinterpret_cast<void **>(&result), bytes)) {
 		return nullptr;
@@ -218,6 +212,9 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 		}
 		else
 			wsCurrentValue = &(vResults[iCurrentPosition].value);
+
+		if (wsCurrentValue == nullptr)
+			return false;
 
 		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (wsCurrentValue->length() + 1) * sizeof(wchar_t)))
 		{
@@ -269,9 +266,9 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
 	}
 	case ePropPattern:
 	{
-		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (sPattern.length() + 1) * sizeof(WCHAR)))
+		if (m_iMemory->AllocMemory((void**)&pvarPropVal->pwstrVal, (sPattern.length() + 1) * sizeof(char16_t)))
 		{
-			memcpy(pvarPropVal->pwstrVal, sPattern.c_str(), sPattern.length() * sizeof(WCHAR));
+			memcpy(pvarPropVal->pwstrVal, sPattern.c_str(), sPattern.length() * sizeof(char16_t));
 			TV_VT(pvarPropVal) = VTYPE_PWSTR;
 			pvarPropVal->wstrLen = sPattern.length();
 			return true;
@@ -348,7 +345,7 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
 				return true;
 		}
 
-		sPattern.assign((char16_t*)varPropVal->pwstrVal, varPropVal->wstrLen);
+		sPattern.assign(reinterpret_cast<char16_t*>(varPropVal->pwstrVal), varPropVal->wstrLen);
 		isPattern = true;
 		return true;
 	}
@@ -436,12 +433,12 @@ long CAddInNative::FindMethod(const WCHAR_T* wsMethodName)
 	std::basic_string<char16_t> usMethodName = (char16_t*)(wsMethodName);
 	tolowerStr(usMethodName);
 
-	auto it = mMethods.find(usMethodName);
-	if (it != mMethods.end())
+	auto it = osMethods.getByKey(usMethodName);
+	if (it != osMethods.end())
 		return it->second;
 
-	it = mMethods_ru.find(usMethodName);
-	if (it != mMethods_ru.end())
+	it = osMethods_ru.getByKey(usMethodName);
+	if (it != osMethods_ru.end())
 		return it->second;
 
 	return -1;
@@ -451,25 +448,28 @@ const WCHAR_T* CAddInNative::GetMethodName(const long lMethodNum, const long lMe
 {
 
 	if (lMethodNum >= eMethLast)
-		return NULL;
+		return nullptr;
 
-	std::basic_string<char16_t> *usCurrentName;
+	const std::basic_string<char16_t> *usCurrentName;
 
 	switch (lMethodAlias)
 	{
 	case 0: // First language
-		usCurrentName = &vMethods[lMethodNum];
+		usCurrentName = &osMethods.getKeyByIndex(lMethodNum);
 		break;
 	case 1: // Second language
-		usCurrentName = &vMethods_ru[lMethodNum];
+		usCurrentName = &osMethods_ru.getKeyByIndex(lMethodNum);
 		break;
 	default:
-		return 0;
+		return nullptr;
 	}
+
+	if (usCurrentName == nullptr)
+		return nullptr;
 
 	WCHAR_T *result = nullptr;
 
-	size_t bytes = (usCurrentName->length() + 1) * sizeof(char16_t);
+	const size_t bytes = (usCurrentName->length() + 1) * sizeof(char16_t);
 
 	if (!m_iMemory || !m_iMemory->AllocMemory(reinterpret_cast<void **>(&result), bytes)) {
 		return nullptr;
@@ -761,12 +761,13 @@ bool CAddInNative::search(tVariant * paParams)
 
 	PCRE2_SIZE *ovector = NULL;
 
+	const size_t subject_length = paParams[0].wstrLen;
+
 	while (true) {
 
 		uint32_t options = 0;
 
 		PCRE2_SIZE start_offset = ovector == NULL ? 0 : ovector[1];   /* Start at end of previous match */
-		size_t subject_length = paParams[0].wstrLen;
 
 		if (ovector != NULL && (ovector[0] == ovector[1]))
 		{
@@ -801,7 +802,7 @@ bool CAddInNative::search(tVariant * paParams)
 
 		if (rc == PCRE2_ERROR_NOMATCH)
 		{
-			if (options == 0) break;                    /* All matches found */
+			if (options == 0 || ovector == NULL) break;                    /* All matches found */
 			ovector[1] = start_offset + 1;              /* Advance one code unit */
 			if (crlf_is_newline &&                      /* If CRLF is a newline & */
 				start_offset < subject_length - 1 &&    /* we are at CRLF, */
@@ -834,6 +835,9 @@ bool CAddInNative::search(tVariant * paParams)
 		}
 
 		ovector = pcre2_get_ovector_pointer(match_data);
+
+		if (ovector == nullptr)
+			break;
 
 		if (ovector[0] > ovector[1])
 		{
@@ -960,12 +964,13 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 	
 	PCRE2_SIZE *ovector = NULL;
 
+	const size_t subject_length = paParams[0].wstrLen;
+
 	while (true) {
 
 		uint32_t options = 0;
 
 		PCRE2_SIZE start_offset = ovector == NULL ? 0 : ovector[1];   /* Start at end of previous match */
-		size_t subject_length = paParams[0].wstrLen;
 
 		if (ovector != NULL && (ovector[0] == ovector[1]))
 		{
@@ -974,7 +979,7 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 		}
 		else if (ovector != NULL)
 		{
-			PCRE2_SIZE startchar = pcre2_get_startchar(match_data);
+			const PCRE2_SIZE startchar = pcre2_get_startchar(match_data);
 			if (start_offset <= startchar)
 			{
 				if (startchar >= subject_length) break;   /* Reached end of subject.   */
@@ -992,7 +997,7 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 		rc = pcre2_match(
 			pattern,                   /* the compiled pattern */
 			(PCRE2_SPTR16)paParams[0].pwstrVal,              /* the subject string */
-			paParams[0].wstrLen,       /* the length of the subject */
+			subject_length,       /* the length of the subject */
 			start_offset,                    /* start at offset 0 in the subject */
 			options,                    /* default options */
 			match_data,           /* block for storing the result */
@@ -1034,6 +1039,8 @@ bool CAddInNative::searchJSON(tVariant* pvarRetValue, tVariant * paParams)
 
 		ovector = pcre2_get_ovector_pointer(match_data);
 
+		if (ovector == nullptr)
+			break;
 		if (ovector[0] > ovector[1])
 		{
 			SetLastError(u"\\K was used in an assertion to set the match start after its end.");
@@ -1367,12 +1374,11 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 void CAddInNative::version(tVariant * pvarRetValue)
 {
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
-	std::basic_string<char16_t> res = u"14.2";
-
-	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (res.length() + 1) * sizeof(char16_t)))
+	
+	if (m_iMemory->AllocMemory((void**)&pvarRetValue->pwstrVal, (sVersion.length() + 1) * sizeof(char16_t)))
 	{
-		memcpy(pvarRetValue->pwstrVal, res.c_str(), (res.length() + 1) * sizeof(char16_t));
-		pvarRetValue->wstrLen = res.length();
+		memcpy(pvarRetValue->pwstrVal, sVersion.c_str(), (sVersion.length() + 1) * sizeof(char16_t));
+		pvarRetValue->wstrLen = sVersion.length();
 	}
 }
 
@@ -1395,7 +1401,7 @@ void CAddInNative::SetLastError(const char16_t* error) {
 	else sErrorDescription = error;
 }
 
-void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex) {
+/*void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex) {
 #if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 	str.resize(paParams[paramIndex].wstrLen);
 	convertUTF16ToUTF32((char16_t *)paParams[paramIndex].pwstrVal, paParams[paramIndex].wstrLen, str);
@@ -1403,12 +1409,13 @@ void  CAddInNative::GetStrParam(std::wstring& str, tVariant* paParams, const lon
 	str.assign(paParams[paramIndex].pwstrVal, paParams[paramIndex].wstrLen);
 #endif
 }
+*/
 
 pcre2_code*  CAddInNative::GetPattern(const tVariant *tvPattern) {
 
 	SetLastError(u"");
 
-	char16_t* patternStr = (char16_t*)tvPattern->pwstrVal;
+	const char16_t* patternStr = (char16_t*)tvPattern->pwstrVal;
 	const long len = tvPattern->wstrLen;
 
 	if (tvPattern->vt != VTYPE_PWSTR)

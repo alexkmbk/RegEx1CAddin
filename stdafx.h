@@ -6,6 +6,7 @@
 #define __STDAFX_H__
 
 #ifdef _WINDOWS
+	#define _WIN32_WINNT _WIN32_WINNT_WIN7
     #include <windows.h>
 #endif //_WINDOWS
 

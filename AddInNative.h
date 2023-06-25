@@ -98,7 +98,7 @@ private:
 	void version(tVariant* pvarRetValue);
 	void SetLastError(const char16_t* error);
 
-	void GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex);
+	//void GetStrParam(std::wstring& str, tVariant* paParams, const long paramIndex);
 	pcre2_code* GetPattern(const tVariant *tvPattern);
 
     // Attributes
@@ -117,9 +117,9 @@ private:
 	pcre2_code* rePattern;
 	std::basic_string<char16_t> sPattern;
 
-#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+/*#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
 	std::u16string uPattern;
-#endif
+#endif*/
 	bool isPattern;
 	bool bGlobal;
 	bool bHierarchicalResultIteration;
