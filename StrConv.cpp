@@ -67,7 +67,7 @@ inline void tolowerPtr(char16_t*);
 void tolowerStr(std::basic_string<char16_t> & s)
 {
 	char16_t* c = const_cast<char16_t*>(s.c_str());
-	size_t l = s.size();
+	const size_t l = s.size();
 	for (char16_t* c2 = c; c2 < c + l; c2++)tolowerPtr(c2);
 };
 
