@@ -5,18 +5,14 @@
 #include <stdio.h>
 #include <wchar.h>
 #include "AddInNative.h"
-#include "OrderedSet.h"
 
-//static const auto g_kClassNames = u"RegEx";
 static const std::u16string sClassName(u"RegEx");
-static const std::u16string sVersion(u"15.10");
+static const std::u16string sVersion(u"15.12");
 
-static const OrderedSet<std::u16string> osMethods = { u"matches", u"ismatch", u"next", u"replace", u"count", u"submatchescount", u"getsubmatch", u"version", u"matchesjson", u"test"};
-static const OrderedSet<std::u16string> osMethods_ru = { u"найтисовпадения", u"совпадает", u"следующий", u"заменить", u"количество", u"количествовложенныхгрупп", u"получитьподгруппу", u"версия", u"найтисовпаденияjson", u"test"};
-
-static const OrderedSet<std::u16string> osProps = { u"currentvalue", u"ignorecase", u"errordescription", u"throwexceptions", u"pattern", u"global", u"firstindex", u"multiline", u"ucp"};
-static const OrderedSet<std::u16string> osProps_ru = { u"текущеезначение", u"игнорироватьрегистр", u"описаниеошибки", u"вызыватьисключения", u"шаблон", u"всесовпадения", u"firstindex", u"многострочный", u"ucp" };
-
+static const std::array<std::u16string, CAddInNative::eMethLast> osMethods = { u"matches", u"ismatch", u"next", u"replace", u"count", u"submatchescount", u"getsubmatch", u"version", u"matchesjson", u"test"};
+static const std::array<std::u16string, CAddInNative::eMethLast> osMethods_ru = { u"найтисовпадения", u"совпадает", u"следующий", u"заменить", u"количество", u"количествовложенныхгрупп", u"получитьподгруппу", u"версия", u"найтисовпаденияjson", u"test" };
+static const std::array<std::u16string, CAddInNative::ePropLast> osProps = { u"currentvalue", u"ignorecase", u"errordescription", u"throwexceptions", u"pattern", u"global", u"firstindex", u"multiline", u"ucp" };
+static const std::array<std::u16string, CAddInNative::ePropLast> osProps_ru = { u"текущеезначение", u"игнорироватьрегистр", u"описаниеошибки", u"вызыватьисключения", u"шаблон", u"всесовпадения", u"firstindex", u"многострочный", u"ucp" };
 
 AppCapabilities g_capabilities = eAppCapabilitiesInvalid;
 
@@ -125,16 +121,18 @@ long CAddInNative::GetNProps()
 //---------------------------------------------------------------------------//
 long CAddInNative::FindProp(const WCHAR_T* wsPropName)
 {
-	std::basic_string<char16_t> usPropName = (char16_t*)(wsPropName);
+	std::u16string usPropName = (char16_t*)(wsPropName);
 	tolowerStr(usPropName);
 
-	auto it = osProps.getByKey(usPropName);
-	if (it != osProps.end())
-		return it->second;
+	auto it = std::find(osProps.begin(), osProps.end(), usPropName);
+	if (it != osProps.end()) {
+		return it - osProps.begin();
+	}
 
-	it = osProps_ru.getByKey(usPropName);
-	if (it != osProps_ru.end())
-		return it->second;
+	it = std::find(osProps_ru.begin(), osProps_ru.end(), usPropName);
+	if (it != osProps_ru.end()) {
+		return it - osProps_ru.begin();
+	}
 
 	return -1;
 }
@@ -150,11 +148,15 @@ const WCHAR_T* CAddInNative::GetPropName(long lPropNum, long lPropAlias)
 	switch (lPropAlias)
 	{
 	case 0: // First language
-		usCurrentName = &osProps.getKeyByIndex(lPropNum);
+	{
+		usCurrentName = &osProps[lPropNum];
 		break;
+	}
 	case 1: // Second language
-		usCurrentName = &osProps_ru.getKeyByIndex(lPropNum);
+	{
+		usCurrentName = &osProps_ru[lPropNum];
 		break;
+	}
 	default:
 		return 0;
 	}
@@ -409,16 +411,18 @@ long CAddInNative::GetNMethods()
 //---------------------------------------------------------------------------//
 long CAddInNative::FindMethod(const WCHAR_T* wsMethodName)
 {
-	std::basic_string<char16_t> usMethodName = (char16_t*)(wsMethodName);
+	std::u16string usMethodName = (char16_t*)(wsMethodName);
 	tolowerStr(usMethodName);
 
-	auto it = osMethods.getByKey(usMethodName);
-	if (it != osMethods.end())
-		return it->second;
+	auto it = std::find(osMethods.begin(), osMethods.end(), usMethodName);
+	if (it != osMethods.end()) {
+		return it - osMethods.begin();
+	}
 
-	it = osMethods_ru.getByKey(usMethodName);
-	if (it != osMethods_ru.end())
-		return it->second;
+	it = std::find(osMethods_ru.begin(), osMethods_ru.end(), usMethodName);
+	if (it != osMethods_ru.end()) {
+		return it - osMethods_ru.begin();
+	}
 
 	return -1;
 }
@@ -434,11 +438,15 @@ const WCHAR_T* CAddInNative::GetMethodName(const long lMethodNum, const long lMe
 	switch (lMethodAlias)
 	{
 	case 0: // First language
-		usCurrentName = &osMethods.getKeyByIndex(lMethodNum);
+	{
+		usCurrentName = &osMethods[lMethodNum];
 		break;
+	}
 	case 1: // Second language
-		usCurrentName = &osMethods_ru.getKeyByIndex(lMethodNum);
+	{
+		usCurrentName = &osMethods_ru[lMethodNum];
 		break;
+	}
 	default:
 		return nullptr;
 	}

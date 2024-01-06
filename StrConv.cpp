@@ -64,7 +64,7 @@ inline void tolowerPtr(char16_t*);
 
 // Приведение к нижнему регистру только для Кириллицы и Латиницы
 //
-void tolowerStr(std::basic_string<char16_t> & s)
+void tolowerStr(std::u16string & s)
 {
 	char16_t* c = const_cast<char16_t*>(s.c_str());
 	const size_t l = s.size();

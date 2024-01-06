@@ -13,12 +13,11 @@
 
 #include <vector>
 #include <map>
+#include <array> 
 #include <locale.h>
 
 #include "StrConv.h"
 #include "json.h"
-
-//#define MBCMAXSIZE  6 // максимальная длина символа мультибайтовой строки (для функции wcstombs)
 
 struct ResultStruct {
 	std::basic_string<char16_t> value;
