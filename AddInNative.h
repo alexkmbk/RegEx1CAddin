@@ -5,7 +5,12 @@
 #define PCRE2_CODE_UNIT_WIDTH 16
 //#define PCRE2_LOCAL_WIDTH 16
 
+//#if defined( __linux__ ) || defined(__APPLE__) || defined(__ANDROID__)
+//#include <pcre2.h>
+//#else
 #include "pcer2/pcre2.h"
+//#endif
+
 
 #include "ComponentBase.h"
 #include "AddInDefBase.h"
@@ -15,6 +20,7 @@
 #include <map>
 #include <array> 
 #include <locale.h>
+#include <algorithm>
 
 #include "StrConv.h"
 #include "json.h"
@@ -88,6 +94,8 @@ public:
     // LocaleBase
     virtual void ADDIN_API SetLocale(const WCHAR_T* loc);
     
+    // UserLanguageBase
+    virtual void ADDIN_API SetUserInterfaceLanguageCode(const WCHAR_T* lang) override;
 private:
  	bool search(tVariant* paParams);
 	bool searchJSON(tVariant* pvarRetValue, tVariant* paParams);
@@ -107,6 +115,7 @@ private:
 	int m_PropCountOfItemsInSearchResult;
 	std::vector<ResultStruct> vResults;
 	std::map<size_t, std::vector<std::basic_string<char16_t>>> mSubMatches;
+    std::map<std::basic_string<char16_t>, size_t> mNamedGroups;
 	int iCurrentPosition;
 	std::basic_string<char16_t> sErrorDescription;
 	bool bThrowExceptions;

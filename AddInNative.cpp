@@ -7,7 +7,7 @@
 #include "AddInNative.h"
 
 static const std::u16string sClassName(u"RegEx");
-static const std::u16string sVersion(u"15.12");
+static const std::u16string sVersion(u"15.13");
 
 static const std::array<std::u16string, CAddInNative::eMethLast> osMethods = { u"matches", u"ismatch", u"next", u"replace", u"count", u"submatchescount", u"getsubmatch", u"version", u"matchesjson", u"test"};
 static const std::array<std::u16string, CAddInNative::eMethLast> osMethods_ru = { u"найтисовпадения", u"совпадает", u"следующий", u"заменить", u"количество", u"количествовложенныхгрупп", u"получитьподгруппу", u"версия", u"найтисовпаденияjson", u"test" };
@@ -858,8 +858,10 @@ bool CAddInNative::search(tVariant * paParams)
 				vResults.push_back(resultStruct);
 			}
 		}
+
 		if (bHierarchicalResultIteration)
 			mSubMatches.insert({ rootIndex, vSubMatches});
+
 		if (!bGlobal) 
 			break;
 	}
@@ -1305,6 +1307,29 @@ bool CAddInNative::getSubMatch(tVariant * pvarRetValue, tVariant * paParams)
 	TV_VT(pvarRetValue) = VTYPE_PWSTR;
 	int subMatchIndex = paParams[0].lVal;
 
+	if (paParams[0].vt == VTYPE_PWSTR && paParams[0].wstrLen != 0)
+	{
+		std::basic_string<char16_t> groupName;
+		groupName.assign((char16_t*)paParams[0].pwstrVal, paParams[0].wstrLen);
+		if (groupName.size() > 0) {
+			auto it = mNamedGroups.find(groupName);
+			if (it != mNamedGroups.end()) {
+				subMatchIndex = it->second - 1;
+			}
+			else {
+				SetLastError(u"The named group was not found");
+				return true;
+			}
+		}
+		else {
+			SetLastError(u"The name of the group is empty");
+			if (bThrowExceptions)
+				return false;
+			else
+				return true;
+		}
+	}
+
 	if (iCurrentPosition < 0) {
 		SetLastError(u"Results were not selected");
 		if (bThrowExceptions)
@@ -1384,6 +1409,8 @@ pcre2_code*  CAddInNative::GetPattern(const tVariant *tvPattern) {
 
 	SetLastError(u"");
 
+	mNamedGroups.clear();
+
 	const char16_t* patternStr = (char16_t*)tvPattern->pwstrVal;
 	const long len = tvPattern->wstrLen;
 
@@ -1394,7 +1421,7 @@ pcre2_code*  CAddInNative::GetPattern(const tVariant *tvPattern) {
 	}
 
 	int errornumber;
-	PCRE2_SIZE erroroffset = NULL;
+	PCRE2_SIZE erroroffset = 0;
 	pcre2_code* res;
 
 	res = pcre2_compile((PCRE2_SPTR16)patternStr,               // the pattern 
@@ -1410,7 +1437,55 @@ pcre2_code*  CAddInNative::GetPattern(const tVariant *tvPattern) {
 		pcre2_get_error_message_16(errornumber, buffer, sizeof(buffer));
 		SetLastError((const char16_t*)buffer);
 	}
+	else {
 
+		// Named groups 
+		PCRE2_SPTR name_table = NULL;
+		uint32_t namecount = 0;
+		uint32_t name_entry_size = 0;
+
+		PCRE2_SPTR tabptr;
+
+		(void)pcre2_pattern_info(
+			res,                   /* the compiled pattern */
+			PCRE2_INFO_NAMECOUNT, /* get the number of named substrings */
+			&namecount);          /* where to put the answer */
+
+		if (namecount != 0)
+		{
+			/* Before we can access the substrings, we must extract the table for
+			translating names to numbers, and the size of each entry in the table. */
+
+			(void)pcre2_pattern_info(
+				res,                       /* the compiled pattern */
+				PCRE2_INFO_NAMETABLE,     /* address of the table */
+				&name_table);             /* where to put the answer */
+
+			(void)pcre2_pattern_info(
+				res,                       /* the compiled pattern */
+				PCRE2_INFO_NAMEENTRYSIZE, /* size of each entry in the table */
+				&name_entry_size);        /* where to put the answer */
+
+			/* In the 8-bit library the number is held in two
+			bytes, most significant first. */
+
+			tabptr = name_table;
+			for (int i = 0; i < namecount; i++)
+			{
+				//size_t n = (tabptr[0] << 8) | tabptr[1];
+				size_t n = tabptr[0];
+				std::basic_string<char16_t> name;
+				name.assign((char16_t*)tabptr + 1, name_entry_size - 2);
+				rtrim(name);
+				mNamedGroups.insert({ name, n });
+				tabptr += name_entry_size;
+			}
+		}
+	}
 	return res;
+}
+
+void ADDIN_API CAddInNative::SetUserInterfaceLanguageCode(const WCHAR_T* lang)
+{
 }
 

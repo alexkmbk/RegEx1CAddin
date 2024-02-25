@@ -66,7 +66,6 @@
         <xs:enumeration value="MacOS"/>
         <xs:enumeration value="iOS"/>
         <xs:enumeration value="Android"/>
-        <xs:enumeration value="WindowsRuntimePhone"/>
         <xs:enumeration value="WindowsRuntime"/>
     </xs:simpleType>
     <xs:simpleType name="ComponentType">
@@ -78,6 +77,8 @@
         <xs:enumeration value="i386"/>
         <xs:enumeration value="x86_64"/>
         <xs:enumeration value="ARM"/>
+        <xs:enumeration value="ARM64"/>
+        <xs:enumeration value="E2K"/>
         <xs:enumeration value="Universal"/>
     </xs:simpleType>
     <xs:simpleType name="ClientType">
@@ -86,6 +87,10 @@
         <xs:enumeration value="MSIE"/>
         <xs:enumeration value="Safari"/>
         <xs:enumeration value="Chrome"/>
+        <xs:enumeration value="YandexBrowser"/>
+        <xs:enumeration value="ChromiumGost"/>
+        <xs:enumeration value="Edge"/>
+        <xs:enumeration value="AnyChromiumBased"/>
     </xs:simpleType>
     <xs:simpleType name="buildTypeEnum">
         <xs:enumeration value="developer"/>

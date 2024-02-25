@@ -139,3 +139,17 @@ import "ocidl.idl";
 		[helpstring("method GetPlatformInfo")] HRESULT GetPlatformInfo([out]AppInfo** info);
 		
 	};
+    typedef [v1_enum] enum _AttachedType {
+        eAttachedIsolated = 0,
+        eAttachedNotIsolated,
+    } AttachedType;
+    [
+		object,
+		uuid(6C269247-815E-42D9-9B17-5F17DF11B98F),
+		helpstring("IAttachedInfo Interface"),
+		pointer_default(unique)
+	]
+	interface IAttachedInfo  : IUnknown
+	{
+		[helpstring("method GetAttachedInfo")] HRESULT GetAttachedInfo([out]AttachedType* con_type);
+	};

@@ -80,6 +80,13 @@ inline void tolowerPtr(char16_t *p)
 		*p = u'ё';
 }
 
+// trim from end (in place)
+void rtrim(std::u16string& s) {
+	s.erase(std::find_if(s.rbegin(), s.rend(), [](char16_t ch) {
+		return (ch!=0&&!std::isspace(ch));
+		}).base(), s.end());
+}
+
 void strrev_u16(char16_t *str, int len)
 {
 	int i;
